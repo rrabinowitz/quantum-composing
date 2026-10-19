@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Overtone Field</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav id="rail">
+  <button data-st="spectra" class="on"><b>I</b><span>Spectra</span></button>
+  <button data-st="pair"><b>II</b><span>Pair</span></button>
+  <button data-st="histories"><b>III</b><span>Histories</span></button>
+  <button data-st="orbits"><b>IV</b><span>Orbits</span></button>
+  <button data-st="register"><b>V</b><span>Register</span></button>
+</nav>
+
+<div id="page">
+  <header id="frame">
+    <select id="interp" title="Interpretation of quantum mechanics"></select>
+    <span id="qParam"></span>
+    <select id="basis" title="The basis in which spectra are measured">
+      <option value="computational">computational basis</option>
+      <option value="fourier">Fourier basis</option>
+      <option value="hadamard">Hadamard basis</option>
+      <option value="haar">random unitary basis</option>
+    </select>
+    <select id="ens" title="Ensemble"></select>
+    <button id="linksBtn" title="Couplings between stations">⇄ couplings</button>
+    <div id="links" hidden></div>
+  </header>
+  <p id="note"></p>
+
+  <section id="spectra" class="st on">
+    <div class="two">
+      <canvas id="specCv" class="plane"></canvas>
+      <div class="side">
+        <div id="specChips" class="chips"></div>
+        <button id="specAdd" class="mini">+ spectrum</button>
+        <div id="specGates" class="row">
+          <button data-g="H" title="Fourier transform: blends every spectrum into every other">F</button>
+          <button data-g="X" title="Shift every amplitude to the next spectrum">X</button>
+          <button data-g="Z" title="Turn every second phasor through 180°">Z</button>
+          <button data-g="T" title="45° phase ramp">T</button>
+          <button data-g="tunnel" title="Leak amplitude through the barrier to the far side of the lattice">Tunnel</button>
+        </div>
+        <div class="row">
+          <button id="specSound" class="go">▶ Let it ring</button>
+          <button id="specMeasure">Look</button>
+          <button id="specPrep">Prepare again</button>
+        </div>
+        <div class="row"><button id="specMidi" class="mini">⤓ MIDI</button><button id="specWav" class="mini">⤓ WAV</button></div>
+        <p id="specStatus" class="status">Drag a phasor. Tap a harmonic of D to measure.</p>
+      </div>
+    </div>
+    <div id="probe" class="probe"></div>
+  </section>
+
+  <section id="pair" class="st">
+    <div class="pairWrap">
+      <div class="particle"><canvas id="orbA" class="orb"></canvas><div class="acts" data-p="A"></div></div>
+      <div id="pairBond" class="bond on"></div>
+      <div class="particle"><canvas id="orbB" class="orb"></canvas><div class="acts" data-p="B"></div></div>
+    </div>
+    <div class="row center">
+      <button id="pairPlay" class="go">▶ Orbit</button>
+      <button id="link" class="toggle on">⚭ Entangled</button>
+      <span class="sep"></span>
+      <select id="bellOp"></select>
+      <select id="bellType"><option value="phi">correlated (|00⟩+|11⟩)/√2</option><option value="psi">anti-correlated (|01⟩+|10⟩)/√2</option></select>
+      <button id="bellGo">Bell pair</button>
+      <button id="bellCollapse">Measure pair</button>
+      <button id="teleport" title="Send A's tune to B; A's original is destroyed (no-cloning)">Teleport A → B</button>
+      <span class="sep"></span>
+      <button id="pairMidi" class="mini">⤓ MIDI</button><button id="pairWav" class="mini">⤓ WAV</button>
+    </div>
+    <div id="rules" class="rules"></div>
+    <p id="pairLog" class="status center">Tap inside an orbit to place or remove a note.</p>
+  </section>
+
+  <section id="histories" class="st">
+    <div class="row">
+      <button id="histGo" class="go">▶ Live one history</button>
+      <select id="hsrc" title="Where harmony comes from"><option value="lattice">harmony: walk on the ratio lattice</option><option value="spectra">harmony: the Spectra superposition</option></select>
+      <label class="lbl" title="How far the harmonic wave spreads per bar">spread <input id="spread" type="range" min="0.1" max="2" step="0.05" value="0.7"></label>
+      <label class="lbl">♩ <input id="bpm" type="range" min="50" max="160" value="84"><span id="bpmV">84</span></label>
+      <span class="sep"></span>
+      <button id="histMidi" class="mini">⤓ MIDI</button><button id="histWav" class="mini">⤓ WAV</button>
+    </div>
+    <div class="row lbls">
+      <label title="Each section's tempo is measured too"><input type="checkbox" id="mTempo"> measure tempo</label>
+      <label title="Each section's loudness is measured too"><input type="checkbox" id="mDyn"> measure loudness</label>
+      <label title="Each part decays with this half-life (bars); new sections re-prepare atoms">☢ half-life <input id="mHalf" type="range" min="0" max="16" value="0"><span id="mHalfV">∞</span></label>
+    </div>
+    <div id="secs" class="secs"></div>
+    <button id="secAdd" class="mini">+ section</button>
+    <div id="worldline" class="worldline"></div>
+    <p id="histStatus" class="status"></p>
+    <ol id="histLog" class="log"></ol>
+  </section>
+
+  <section id="orbits" class="st">
+    <div class="two">
+      <canvas id="orbitCv" class="plane"></canvas>
+      <div class="side">
+        <div id="orbRings" class="rings"></div>
+        <button id="orbAdd" class="mini">+ ring</button>
+        <div class="row">
+          <button id="orbPlay" class="go">▶ Spin</button>
+          <button id="orbOpen">Open the box</button>
+          <button id="orbMidi" class="mini">⤓ MIDI</button><button id="orbWav" class="mini">⤓ WAV</button>
+        </div>
+        <p id="orbStatus" class="status"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="register" class="st">
+    <div id="regTools" class="row tools"></div>
+    <div class="two reg">
+      <canvas id="regCv" class="regCv"></canvas>
+      <canvas id="regAmps" class="regAmps"></canvas>
+    </div>
+    <div class="row">
+      <button id="regPlay" class="go">▶ Run</button>
+      <select id="regTune"></select>
+      <select id="regInst"></select>
+      <button id="regAdd" class="mini">+ qubit</button><button id="regRem" class="mini">− qubit</button><button id="regClear" class="mini">clear</button>
+      <span class="sep"></span>
+      <button id="regMidi" class="mini">⤓ MIDI</button><button id="regWav" class="mini">⤓ WAV</button>
+    </div>
+    <p id="regStatus" class="status"></p>
+  </section>
+</div>
+<script type="module" src="main.js"></script>
+</body>
+</html>

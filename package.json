@@ -1,0 +1,18 @@
+{
+  "name": "quantum-composing",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Overtone Field — quantum composition with waveguide and modal synthesis",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test",
+    "macos:app": "bash scripts/build-macos-app.sh",
+    "macos:install": "bash scripts/build-macos-app.sh --install"
+  },
+  "devDependencies": {
+    "vite": "^6.2.0"
+  }
+}

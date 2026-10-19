@@ -1,0 +1,104 @@
+:root{--paper:#f4efe4;--card:#fbf8f1;--ink:#2a2622;--dim:#7a7064;--rule:#d9d0bf;--accent:#c2452d;--blue:#2d5fc2;--gold:#b8860b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Georgia,"Iowan Old Style",serif;min-height:100vh;display:flex;
+  background-image:radial-gradient(#2a26220c 1px,transparent 1px);background-size:18px 18px}
+#rail{position:sticky;top:0;height:100dvh;display:flex;flex-direction:column;gap:2px;padding:22px 0;border-right:1px solid var(--rule);background:#efe8da;min-width:96px}
+#rail button{background:none;border:0;border-left:3px solid transparent;padding:12px 14px;min-height:44px;text-align:left;cursor:pointer;color:var(--dim);font:inherit;display:flex;flex-direction:column}
+#rail b{font-size:20px;font-weight:400;letter-spacing:.04em}
+#rail span{font-size:12px;font-style:italic}
+#rail button.on{color:var(--ink);border-color:var(--accent);background:#f7f2e8}
+#page{flex:1;min-width:0;max-width:1040px;margin:0 auto;padding:18px 24px 40px}
+#frame{display:flex;flex-wrap:wrap;gap:8px;align-items:center;position:relative}
+#qParam{display:flex;gap:6px;align-items:center}
+#qParam input[type=number]{width:90px}
+#links{position:absolute;top:100%;right:0;z-index:5;margin-top:6px;background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:10px 14px;display:flex;flex-direction:column;gap:6px;box-shadow:0 8px 24px #2a262222;font-size:14px}
+#links[hidden]{display:none}
+#links label{display:flex;gap:8px;align-items:center;cursor:pointer}
+#note{font-style:italic;color:var(--dim);margin:10px 0 16px;max-width:760px;font-size:14px}
+button,select,input[type=number],input:not([type]){font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:6px 11px}
+button{cursor:pointer}button:hover{border-color:var(--ink)}
+button:disabled{opacity:.55;cursor:wait}
+button.go{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+button.go:hover{background:#000}
+#audioUnlock{position:fixed;z-index:1000;bottom:1rem;left:50%;transform:translateX(-50%);padding:.8rem 1.2rem;background:var(--ink);color:var(--paper);border:0;border-radius:999px;box-shadow:0 8px 24px #2a262244}
+#audioStatus{position:fixed;z-index:900;bottom:1rem;right:1rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 2rem);padding:8px 10px;background:var(--card);border:1px solid var(--rule);border-radius:6px;box-shadow:0 8px 24px #2a262222;font-size:13px}
+#audioStatus button{font-size:13px;padding:3px 8px}
+button.mini{padding:3px 8px;font-size:13px}
+button.on,button.toggle.on,#linksBtn.on{border-color:var(--accent);color:var(--accent)}
+input[type=range]{accent-color:var(--ink)}
+.st{display:none}.st.on{display:block}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+.row.center{justify-content:center}
+.sep{flex:1}
+.lbl,.lbls label{display:flex;gap:6px;align-items:center;color:var(--dim);font-size:14px}
+.lbls{gap:18px}
+.lbl input[type=range]{width:100px}
+.status{color:var(--dim);min-height:22px;font-size:14px}
+.status b,.log b{color:var(--ink)}
+.center{text-align:center}
+.dim{color:var(--dim)}
+.two{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap}
+.plane{width:min(440px,100%);flex:0 0 auto;display:block;touch-action:none;cursor:grab;background:var(--card);border:1px solid var(--rule);border-radius:50%}
+.side{flex:1;min-width:260px}
+.chips{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.chip{display:flex;gap:8px;align-items:center;background:var(--card);border:1px solid var(--rule);border-left:4px solid var(--h);border-radius:6px;padding:5px 8px;transition:opacity .3s}
+.chip i{width:10px;height:10px;border-radius:50%;background:var(--h)}
+.chip select{flex:1;border:0;background:none;padding:2px}
+.chip .pr{width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.chip.won{box-shadow:0 0 0 2px var(--h)}
+.chip.lost{opacity:.4}
+#specGates button{min-width:38px;font-style:italic}
+.probe{display:flex;gap:4px;margin-top:22px;align-items:flex-end;height:120px}
+.harm{flex:1;padding:0;height:calc(40px + var(--k) * 80px);border-radius:4px 4px 0 0;background:linear-gradient(#fbf8f1,#efe6d4);font-size:13px;color:var(--dim);display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;user-select:none}
+.harm.hit{background:var(--gold);color:#fff}
+.pairWrap{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+.particle{display:flex;flex-direction:column;align-items:center;gap:8px;width:min(380px,100%)}
+.orb{width:100%;display:block;cursor:crosshair;background:var(--card);border:1px solid var(--rule);border-radius:50%;transition:box-shadow .2s}
+.orb.pulse{box-shadow:0 0 0 3px var(--gold)}
+.acts{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+.bond{width:60px;height:2px;background:repeating-linear-gradient(90deg,var(--dim) 0 4px,transparent 4px 8px);opacity:.4;position:relative}
+.bond.on{background:linear-gradient(90deg,var(--accent),var(--blue));opacity:1;height:3px}
+.bond.on::after{content:"⚭";position:absolute;left:50%;top:50%;transform:translate(-50%,-55%);background:var(--paper);padding:0 4px;font-size:20px}
+.rules{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;font-size:13px;color:var(--dim)}
+.rules label{display:flex;gap:4px;align-items:center}
+.rules select{padding:2px 6px;font-size:13px}
+.secs{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 8px}
+.sec{background:var(--card);border:1px solid var(--rule);border-top:4px solid var(--h);border-radius:6px;padding:10px;width:250px;display:flex;flex-direction:column;gap:8px}
+.secHead{display:flex;gap:6px;align-items:center}
+.secHead .nm{width:48px;text-align:center;font-size:18px;font-style:italic;color:var(--h);padding:2px}
+.secHead select{flex:1}
+.forks{display:flex;flex-direction:column;gap:4px;padding-left:10px;border-left:2px solid var(--h)}
+.fork{display:flex;gap:5px;align-items:center;font-size:13px}
+.prong{width:14px;height:2px;background:var(--h);margin-left:-12px}
+.fork input[type=number]{width:46px;padding:2px 4px}
+.fork small{color:var(--dim)}
+.fork input[type=range]{width:62px}
+.fork .pp{width:34px;text-align:right;font-weight:400;font-variant-numeric:tabular-nums}
+.secFoot{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--dim)}
+.secFoot label{display:flex;gap:4px;align-items:center}
+.secFoot input{width:70px}
+.worldline{display:flex;height:50px;border-radius:25px;overflow:hidden;position:relative;margin-top:16px;background:var(--card);border:1px solid var(--rule)}
+.seg{display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;font-style:italic;font-size:15px;border-right:2px solid var(--paper)}
+.seg small{font-style:normal;font-size:11px;opacity:.8}
+.seg.dead{filter:grayscale(1) brightness(.7)}
+.worldline .head{position:absolute;top:0;bottom:0;width:2px;background:var(--ink)}
+.log{color:var(--dim);font-size:13px;padding-left:22px}
+.rings{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.ringRow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:5px 8px;font-size:13px}
+.ringRow .sw{width:12px;height:12px;border-radius:50%}
+.ringRow select{padding:3px 6px;font-size:13px}
+.ringRow label{display:flex;gap:3px;align-items:center;color:var(--dim)}
+.ringRow input[type=number]{width:48px;padding:2px 4px}
+.ringRow input[type=range]{width:64px}
+.tools .gate{min-width:40px;font-weight:600}
+.gate.sel{border-color:var(--gold);background:#f3e2b8}
+.reg{gap:20px}
+.regCv{flex:1 1 360px;min-width:260px;display:block;background:var(--card);border:1px solid var(--rule);border-radius:6px;cursor:pointer}
+.regAmps{flex:1 1 300px;min-width:240px;display:block}
+@media(max-width:720px){
+  body{flex-direction:column}
+  #rail{position:static;height:auto;flex-direction:row;justify-content:center;padding:6px;border-right:0;border-bottom:1px solid var(--rule)}
+  #rail button{border-left:0;border-bottom:3px solid transparent;align-items:center;padding:6px 10px}
+  #rail button.on{border-color:var(--accent)}
+  #page{padding:12px}
+}
