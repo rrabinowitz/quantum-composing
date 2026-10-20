@@ -1,6 +1,6 @@
 // II · Pair — two particles, each a 16-step tune drawn as a closed orbit (angle = time, radius = overtone degree).
 // Operate on one and, while entangled, the other answers by the rule table.
-import { S, $, on, pal, OPS, op, applyPair, degMidi, DEG_MIN, DEG_MAX } from "./world.js";
+import { S, $, on, pal, OPS, op, applyPair, degMidi, DEG_MIN, DEG_MAX, beginPerformance, endPerformance } from "./world.js";
 import { draw as pick, pass } from "./ket.js";
 import { note, runLoop, at, ac } from "./audio.js";
 import { pairBranches, pairNotes, stream, color, buildPair } from "./score.js";
@@ -112,6 +112,7 @@ export function paint() {
   $("pairBond").classList.toggle("on", S.linked);
 }
 function play() {
+  beginPerformance("pair", halt);
   const e8 = () => 30 / S.bpm; let hs = null, cyc = 0;
   stop = runLoop(e8, (i, t, bus) => {
     const s = i % 16;
@@ -127,4 +128,4 @@ function play() {
   });
   $("pairPlay").textContent = "■ Stop";
 }
-function halt() { clearTimeout(refreshTimer); stop && stop(); stop = null; now = -1; paint(); $("pairPlay").textContent = "▶ Orbit"; }
+function halt() { endPerformance("pair"); clearTimeout(refreshTimer); stop && stop(); stop = null; now = -1; paint(); $("pairPlay").textContent = "▶ Orbit"; }

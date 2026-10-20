@@ -1,6 +1,6 @@
 // I · Spectra — a superposition of harmonic spectra drawn as phasors in the complex plane.
 // Drag a phasor: its length is |α|, its angle is φ. Probe it with a harmonic of D to measure.
-import { S, $, on, emit, pal, SPECTRUM_NAMES, SPECTRA, voicing, contains, harmMidi, degMidi } from "./world.js";
+import { S, $, on, emit, pal, SPECTRUM_NAMES, SPECTRA, voicing, contains, harmMidi, degMidi, beginPerformance, endPerformance } from "./world.js";
 import { odds, born, draw, look, rand, pass, toC, fromC } from "./ket.js";
 import { ac, note, pad, createBus, runLoop, at, noiseSrc } from "./audio.js";
 import { collapseSound, buildSpectra } from "./score.js";
@@ -149,6 +149,7 @@ function frame() {
 
 // ---- sound ----
 function start() {
+  beginPerformance("spectra", silence);
   const bus = createBus(), c = ac();
   sound = { bus, layers: S.spec.map((s) => {
     const g = c.createGain(), p = c.createStereoPanner ? c.createStereoPanner() : c.createGain(); g.gain.value = 0; g.connect(p); p.connect(bus);
@@ -160,6 +161,7 @@ function start() {
   prepT = performance.now(); $("specSound").textContent = "■ Silence"; syncProbeLoop();
 }
 function silence() {
+  endPerformance("spectra");
   if (!sound) return; const s = sound; sound = null;
   s.bus.gain.setTargetAtTime(0, ac().currentTime, 0.15);
   setTimeout(() => { s.layers.forEach((l) => l.stops.forEach((f) => f())); s.envStop(); s.bus.disconnect(); }, 900);

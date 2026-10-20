@@ -2,7 +2,7 @@
   "name": "quantum-composing",
   "version": "0.2.0",
   "private": true,
-  "description": "Overtone Field — quantum composition with waveguide and modal synthesis",
+  "description": "Quantum Composing — waveguide and modal synthesis on a just-intonation lattice",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -1,6 +1,6 @@
 // III · Histories — a piece is a sum over histories. Each section's length (and optionally tempo,
 // loudness and survival) is a superposition; performing it measures one history.
-import { S, $, on, emit, OPS, op, applyPair, INTERP, pal, ENSEMBLES } from "./world.js";
+import { S, $, on, emit, OPS, op, applyPair, INTERP, pal, ENSEMBLES, beginPerformance, endPerformance } from "./world.js";
 import { born, draw, look, rand, pass, odds, entropy } from "./ket.js";
 import { note, runEvents, at, ac } from "./audio.js";
 import { composer, color, hLabel } from "./score.js";
@@ -112,15 +112,16 @@ function record(P) {
 }
 
 function perform() {
+  beginPerformance("histories", halt);
   const P = (last = record(buildHistory()));
   const tl = $("worldline"); tl.innerHTML = "";
   P.form.forEach((f, i) => { const b = document.createElement("div"); b.className = "seg" + (f.dead ? " dead" : ""); b.style.flex = f.bars / f.tempo; b.style.background = HUES[i % HUES.length]; b.innerHTML = `${f.dead ? "☠ " : ""}${f.name}<small>${f.bars} · ${Math.round(f.p * 100)}%</small>`; tl.appendChild(b); });
   const head = document.createElement("div"); head.className = "head"; tl.appendChild(head);
   const ev = P.notes.map((n) => ({ t: n.t, fn: (time, bus) => note(n.midi, time, n.dur, n.voice, n.vel, bus, n.fx) }));
   P.labels.forEach((l) => ev.push({ t: l.t, fn: (time) => at(time, () => ($("histStatus").innerHTML = l.html)) }));
-  perf = runEvents(ev, () => { perf = null; cancelAnimationFrame(raf); $("histStatus").innerHTML = "The history is complete."; head.remove(); $("histGo").textContent = "▶ Live one history"; });
+  perf = runEvents(ev, () => { endPerformance("histories"); perf = null; cancelAnimationFrame(raf); $("histStatus").innerHTML = "The history is complete."; head.remove(); $("histGo").textContent = "▶ Live one history"; });
   const tick = () => { if (!perf) return; head.style.left = Math.min(1, Math.max(0, (ac().currentTime - perf.t0) / P.total)) * 100 + "%"; raf = requestAnimationFrame(tick); };
   tick();
   $("histGo").textContent = "■ Stop";
 }
-function halt() { clearTimeout(refreshTimer); if (perf) perf.stop(); perf = null; cancelAnimationFrame(raf); document.querySelector("#worldline .head")?.remove(); $("histGo").textContent = "▶ Live one history"; }
+function halt() { endPerformance("histories"); clearTimeout(refreshTimer); if (perf) perf.stop(); perf = null; cancelAnimationFrame(raf); document.querySelector("#worldline .head")?.remove(); $("histGo").textContent = "▶ Live one history"; }

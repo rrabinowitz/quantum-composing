@@ -3,7 +3,7 @@ import WebKit
 import UniformTypeIdentifiers
 
 /// WKWebView shell. Loads Contents/Resources/www.
-/// swiftc -O -parse-as-library OvertoneField.swift -o "Overtone Field"
+/// swiftc -O -parse-as-library OvertoneField.swift -o "Quantum Composing"
 
 @main
 struct OvertoneFieldMain {
@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
       backing: .buffered,
       defer: false
     )
-    window.title = "Overtone Field"
+    window.title = "Quantum Composing"
     window.minSize = NSSize(width: 880, height: 640)
     window.collectionBehavior = [.fullScreenPrimary]
     window.isReleasedWhenClosed = true
@@ -72,17 +72,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     let mainMenu = NSMenu()
     let appMenuItem = NSMenuItem()
     mainMenu.addItem(appMenuItem)
-    let appMenu = NSMenu(title: "Overtone Field")
+    let appMenu = NSMenu(title: "Quantum Composing")
     appMenuItem.submenu = appMenu
-    appMenu.addItem(withTitle: "About Overtone Field", action: #selector(showAbout), keyEquivalent: "")
+    appMenu.addItem(withTitle: "About Quantum Composing", action: #selector(showAbout), keyEquivalent: "")
     appMenu.addItem(NSMenuItem.separator())
-    appMenu.addItem(withTitle: "Hide Overtone Field", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+    appMenu.addItem(withTitle: "Hide Quantum Composing", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
     let hideOthers = NSMenuItem(title: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
     hideOthers.keyEquivalentModifierMask = [.command, .option]
     appMenu.addItem(hideOthers)
     appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
     appMenu.addItem(NSMenuItem.separator())
-    appMenu.addItem(withTitle: "Quit Overtone Field", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    appMenu.addItem(withTitle: "Quit Quantum Composing", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
     let fileMenuItem = NSMenuItem()
     mainMenu.addItem(fileMenuItem)
@@ -94,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
   @objc private func showAbout() {
     let alert = NSAlert()
-    alert.messageText = "Overtone Field"
+    alert.messageText = "Quantum Composing"
     alert.informativeText = "Quantum composition on a just-intonation lattice.\nSound is waveguide and modal synthesis."
     alert.runModal()
   }
@@ -104,7 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     let indexURL = resourceURL.appendingPathComponent("www").appendingPathComponent("index.html")
     guard FileManager.default.fileExists(atPath: indexURL.path) else {
       let alert = NSAlert()
-      alert.messageText = "Overtone Field"
+      alert.messageText = "Quantum Composing"
       alert.informativeText = "Missing bundled page at \(indexURL.path)"
       alert.runModal()
       NSApp.terminate(nil)

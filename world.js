@@ -126,3 +126,19 @@ const bus = new EventTarget();
 export const emit = (n) => bus.dispatchEvent(new Event(n));
 export const on = (n, f) => bus.addEventListener(n, f);
 export const $ = (id) => document.getElementById(id);
+
+const performances = new Map();
+
+/** Starting playback on one station stops every other station that is still running. */
+export function beginPerformance(id, stop) {
+  for (const [other, halt] of performances) {
+    if (other === id) continue;
+    performances.delete(other);
+    halt();
+  }
+  performances.set(id, stop);
+}
+
+export function endPerformance(id) {
+  performances.delete(id);
+}

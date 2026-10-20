@@ -1,7 +1,7 @@
 // IV · Orbits — a quantum drum machine made of concentric rings. Each ring has its own number of
 // steps spread over the same bar (polyrhythm). Every step is a qubit:
 //  ○ silent · ● hit · ◐ superposed (P = ring's |α|²) · 🐱 GHZ: all cat steps share one measurement per bar.
-import { S, $, on } from "./world.js";
+import { S, $, on, beginPerformance, endPerformance } from "./world.js";
 import { rand, pass } from "./ket.js";
 import { note, runLoop, at, ac } from "./audio.js";
 import { color } from "./score.js";
@@ -165,6 +165,7 @@ export function paint(phase = -1) {
 }
 let raf = 0;
 function play() {
+  beginPerformance("orbits", halt);
   const mem = memory(); pass(7);
   stop = runLoop(() => 240 / S.bpm, (i, t, bus) => {
     const m = measureBar(mem), bar = 240 / S.bpm;
@@ -176,4 +177,4 @@ function play() {
   tick();
   $("orbPlay").textContent = "■ Stop";
 }
-function halt() { clearTimeout(refreshTimer); stop && stop(); stop = null; cancelAnimationFrame(raf); paint(); $("orbPlay").textContent = "▶ Spin"; }
+function halt() { endPerformance("orbits"); clearTimeout(refreshTimer); stop && stop(); stop = null; cancelAnimationFrame(raf); paint(); $("orbPlay").textContent = "▶ Spin"; }

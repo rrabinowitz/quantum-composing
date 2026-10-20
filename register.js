@@ -1,6 +1,6 @@
 // V · Register — a small quantum computer. Time runs downward; each column is a qubit.
 // Every time step the whole state sounds: basis state |k⟩ is a pitch, loudness |α_k|², stereo position its phase.
-import { S, $, on, degMidi, rToMidi, harmMidi } from "./world.js";
+import { S, $, on, degMidi, rToMidi, harmMidi, beginPerformance, endPerformance } from "./world.js";
 import { rand, pass, look } from "./ket.js";
 import { note, runLoop, at, ac } from "./audio.js";
 import { wireExport } from "./export.js";
@@ -170,6 +170,7 @@ function clocks() {
   });
 }
 function play() {
+  beginPerformance("register", halt);
   pass(8); let sim = null;
   stop = runLoop(() => 30 / S.bpm, (i, t, bus) => {
     const r = i % ROWS, e8 = 30 / S.bpm, out = [];
@@ -186,4 +187,4 @@ function play() {
   });
   $("regPlay").textContent = "■ Stop";
 }
-function halt() { stop && stop(); stop = null; row = -1; preview(); $("regPlay").textContent = "▶ Run"; }
+function halt() { endPerformance("register"); stop && stop(); stop = null; row = -1; preview(); $("regPlay").textContent = "▶ Run"; }

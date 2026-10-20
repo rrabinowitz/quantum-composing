@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Overtone Field.app and optionally copy it to /Applications.
+# Build Quantum Composing.app and optionally copy it to /Applications.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -19,8 +19,8 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
-APP_NAME="Overtone Field"
-BUNDLE_ID="com.robertrabinowitz.overtonefield"
+APP_NAME="Quantum Composing"
+BUNDLE_ID="com.robertrabinowitz.quantumcomposing"
 VERSION="$(node -p "require('./package.json').version")"
 OUT_DIR="$ROOT/dist-macos"
 APP_PATH="$OUT_DIR/${APP_NAME}.app"
