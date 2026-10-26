@@ -76,7 +76,8 @@
             <li><strong>II Pair.</strong> Tap inside an orbit to place or remove a note. <em>Entangled</em> ties the two particles. <em>Orbit</em> plays them. <em>Bell pair</em> prepares a pair; <em>Measure pair</em> reads it. <em>Teleport A → B</em> sends A’s tune to B and clears A.</li>
             <li><strong>III Histories.</strong> The blocks are sections. <em>+ section</em> adds one. Set where the harmony comes from, the spread, and the tempo. <em>Live one history</em> plays it. <em>measure tempo</em>, <em>measure loudness</em>, and <em>half-life</em> change what gets measured along the way.</li>
             <li><strong>IV Orbits.</strong> <em>+ ring</em> adds a ring. <em>Spin</em> plays them. <em>Open the box</em> reads the state.</li>
-            <li><strong>V Register.</strong> Pick a gate, then tap the grid. Time runs downward. <em>Run</em> plays the state. The two menus choose the tuning and the instrument. <em>+ qubit</em> and <em>− qubit</em> change the width. <em>clear</em> empties the grid.</li>
+            <li><strong>V Register.</strong> Pick a gate, then tap the grid. Time runs downward. <em>Run</em> plays the state. The two menus choose the tuning and the instrument. <em>readout</em> is the last hit of each pass; it starts as bowl. <em>second pass</em> is the instrument for the second time through; it starts as same instrument. <em>+ qubit</em> and <em>− qubit</em> change the width. <em>clear</em> empties the grid.</li>
+            <li><strong>Orchestration</strong>, under the title. <em>tune</em>, <em>inner</em>, and <em>bass</em> set how loud each part sits. They start at 100, 58, and 72. <em>tune double</em>, <em>inner double</em>, and <em>bass double</em> are Bare, Unison, or Octave: Unison and Octave add a second instrument. <em>long notes</em> is Restrike or Held voice. Restrike repeats a note the instrument cannot hold. Held voice gives that line to an instrument that can. <em>rescore</em> is As scored, Assign by hand, or another ensemble. Assign by hand shows melody, counter-melody, counter-voice, chord, and bass voice. <em>chairs</em> is All at once or Admit one by one: bass and chord, then the inner parts, then the tune, then the drums.</li>
             <li>Each station has its own <em>volume</em> slider. They start at 80. <em>MIDI</em> and <em>WAV</em> download that station. Starting play on one station stops the others.</li>
           </ol>
           <p class="help-keys">Press <kbd>?</kbd> to open this. Esc closes it.</p>
@@ -118,6 +119,25 @@
     <button id="linksBtn" title="Couplings between stations">⇄ couplings</button>
     <div id="links" hidden></div>
   </header>
+  <div id="orch" class="orch" aria-label="Orchestration">
+    <span class="orch-name">Orchestration</span>
+    <label class="lbl" title="How loud the tune sits against the other parts">tune <input id="orchTune" type="range" min="0" max="100" value="100" aria-label="Tune balance"><output>100</output></label>
+    <label class="lbl" title="Counter-voice, counter-melody, and chord">inner <input id="orchInner" type="range" min="0" max="100" value="58" aria-label="Inner balance"><output>58</output></label>
+    <label class="lbl" title="The bass">bass <input id="orchBass" type="range" min="0" max="100" value="72" aria-label="Bass balance"><output>72</output></label>
+    <label class="lbl">tune double <select id="orchTuneDouble" aria-label="Tune double"><option value="bare">Bare</option><option value="unison">Unison</option><option value="octave">Octave</option></select></label>
+    <label class="lbl">inner double <select id="orchInnerDouble" aria-label="Inner double"><option value="bare">Bare</option><option value="unison">Unison</option><option value="octave">Octave</option></select></label>
+    <label class="lbl">bass double <select id="orchBassDouble" aria-label="Bass double"><option value="bare">Bare</option><option value="unison">Unison</option><option value="octave">Octave</option></select></label>
+    <label class="lbl">long notes <select id="orchLong" aria-label="Long notes"><option value="restrike">Restrike</option><option value="held">Held voice</option></select></label>
+    <label class="lbl">rescore <select id="orchScore" aria-label="Rescore"></select></label>
+    <span id="orchHand" hidden>
+      <label class="lbl">melody <select id="handMel" aria-label="Melody instrument"></select></label>
+      <label class="lbl">counter-melody <select id="handCtr" aria-label="Counter-melody instrument"></select></label>
+      <label class="lbl">counter-voice <select id="handCp" aria-label="Counter-voice instrument"></select></label>
+      <label class="lbl">chord <select id="handChord" aria-label="Chord instrument"></select></label>
+      <label class="lbl">bass voice <select id="handBass" aria-label="Bass instrument"></select></label>
+    </span>
+    <label class="lbl">chairs <select id="orchChairs" aria-label="Chairs"><option value="all">All at once</option><option value="grow">Admit one by one</option></select></label>
+  </div>
   <p id="note"></p>
 
   <section id="spectra" class="st on">
@@ -217,7 +237,9 @@
     <div class="row">
       <button id="regPlay" class="go">▶ Run</button>
       <select id="regTune"></select>
-      <select id="regInst"></select>
+      <select id="regInst" aria-label="Instrument"></select>
+      <label class="lbl">readout <select id="regRead" aria-label="Readout"></select></label>
+      <label class="lbl">second pass <select id="regSecond" aria-label="Second pass"></select></label>
       <button id="regAdd" class="mini">+ qubit</button><button id="regRem" class="mini">− qubit</button><button id="regClear" class="mini">clear</button>
       <span class="sep"></span>
       <button id="regMidi" class="mini">⤓ MIDI</button><button id="regWav" class="mini">⤓ WAV</button>

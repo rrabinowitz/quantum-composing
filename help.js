@@ -28,7 +28,8 @@ const PAGES = {
       "II Pair is two 16-step themes, A and B. Entangled ties an operation on one to the matching operation on the other. Bell pair prepares a correlated or anti-correlated pair; Measure pair reads it out. Teleport A → B sends A’s tune to B and clears A.",
       "III Histories is the piece. Sections are the blocks along the line. Live one history plays one of them. Harmony can walk the ratio lattice, or it can follow the Spectra superposition.",
       "IV Orbits is a set of rings. Spin plays them. Open the box reads the state.",
-      "V Register is a small computer. Time runs downward; each column is a qubit. Run sounds the state: each basis state is a pitch, loudness is its probability, and stereo position is its phase.",
+      "V Register is a small computer. Time runs downward; each column is a qubit. Run sounds the state: each basis state is a pitch, loudness is its probability, and stereo position is its phase. readout is the last hit of each pass. second pass plays the circuit again on another instrument.",
+      "Orchestration sits under the title. tune, inner, and bass are how loud each part sits. tune double, inner double, and bass double add a second instrument at the unison or the octave. long notes either restrikes a tone the instrument cannot hold, or hands it to a voice that can. rescore keeps the pitches and puts another ensemble on them, or assigns each part by hand. chairs can admit the bass and chord first, then the inner parts, then the tune, then the drums.",
     ],
   },
   sound: {

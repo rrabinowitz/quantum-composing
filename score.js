@@ -3,6 +3,7 @@ import { S, pal, tonesOf, voicing, degMidi, rToMidi, op, contains } from "./worl
 import { odds, draw, look, rand, born, pass, entropy } from "./ket.js";
 import { Walk, nameOf, nodeOf } from "./lattice.js";
 import { vary, counterVoice, rhythmFor } from "./boltzmann.js";
+import { dress } from "./orch.js";
 
 const pack = (name, w = 1) => ({ name, w, tones: tonesOf(name) });
 const VOW = ["o", "a", "e", "u"];
@@ -139,7 +140,7 @@ export function stream() {
 export const hLabel = (h) => h.map((x) => x.name + (h.length > 1 ? " " + Math.round(x.w * 100) + "%" : "")).join(" ⊕ ");
 
 export function bed(h, t, dur, out, vel = 0.06) {
-  h.forEach(({ name, w }) => voicing(name).forEach((m, j) => out.push({ midi: m, t, dur, voice: j ? pal().chord : pal().bass, vel: (j ? vel : vel * 1.6) * Math.sqrt(w), role: "chord" })));
+  h.forEach(({ name, w }) => voicing(name).forEach((m, j) => out.push({ midi: m, t, dur, voice: j ? pal().chord : pal().bass, vel: (j ? vel : vel * 1.6) * Math.sqrt(w), role: j ? "chord" : "bass" })));
   return out;
 }
 
@@ -158,7 +159,7 @@ export function color(notes, { bar, total, offset = 0, bell = null, ticks = fals
     }
     const x = { ...n, fx: f };
     if (mode === "copenhagen") { f.smear = n.role === "chord" ? 0.5 : 0.3; out.push(x); }
-    else if (mode === "mwi" && n.role === "theme") { const W = Math.min(5, 1 + Math.floor((n.t + offset) / (bar * 2))); for (let k = 0; k < W; k++) out.push({ ...x, t: n.t + k * k * 0.018, midi: n.midi + [0, 12, -12, 0, 24][k], vel: n.vel / Math.sqrt(W), fx: { ...f, pan: W > 1 ? -0.9 + (1.8 * k) / (W - 1) : f.pan, detune: (k - (W - 1) / 2) * 7 } }); }
+    else if (mode === "mwi" && n.role === "theme") { const W = Math.min(5, 1 + Math.floor((n.t + offset) / (bar * 2))); for (let k = 0; k < W; k++) out.push({ ...x, t: n.t + k * k * 0.018, midi: n.midi + [0, 12, -12, 0, 24][k], vel: n.vel / Math.sqrt(W), fx: { ...f, octaveCopy: k > 0, pan: W > 1 ? -0.9 + (1.8 * k) / (W - 1) : f.pan, detune: (k - (W - 1) / 2) * 7 } }); }
     else if (mode === "zeno" && n.role === "theme") { const z = Q.zeno, k = 1 + Math.round(z * 3); for (let i = 0; i < k; i++) out.push({ ...x, t: n.t + (i * n.dur) / k, dur: n.dur / k, vel: n.vel * (i ? 0.6 : 1) }); }
     else if (mode === "decoherence") { const c = Math.exp(-Q.gamma * ((n.t + offset) / bar)); out.push({ ...x, fx: { ...f, coh: c, detune: (rand() - 0.5) * 40 * c } }); }
     else if (mode === "grw") { out.push({ ...x, fx: { ...f, smear: rand() < Q.grw ? 0 : 0.7 } }); }
@@ -166,15 +167,15 @@ export function color(notes, { bar, total, offset = 0, bell = null, ticks = fals
     else out.push(x);
   });
   if (ticks && mode !== "zeno") for (let t = 0; t < total; t += bar) out.push({ midi: 100, t, dur: 0.01, voice: "tick", vel: 0.04, role: "fx" });
-  return out;
+  return dress(out, { total });
 }
 
 // the sound of one collapse onto a spectrum (or a split, under Many-Worlds)
 export function collapseSound(h) {
   const out = [], mode = S.q.mode;
-  h.forEach(({ name, w }, i) => voicing(name).forEach((m, j) => out.push({ midi: m + (j ? 12 : 0), t: j * 0.03 + i * 0.05, dur: 1.6, voice: pal().chord, vel: 0.09 * Math.sqrt(w), fx: { smear: mode === "copenhagen" ? 0.4 : 0, pan: h.length > 1 ? -0.7 + (1.4 * i) / Math.max(1, h.length - 1) : 0 } })));
-  out.push({ midi: 100, t: 0, dur: 0.01, voice: mode === "grw" ? "thump" : "tick", vel: 0.06 });
-  return out;
+  h.forEach(({ name, w }, i) => voicing(name).forEach((m, j) => out.push({ midi: m + (j ? 12 : 0), t: j * 0.03 + i * 0.05, dur: 1.6, voice: pal().chord, vel: 0.09 * Math.sqrt(w), role: j ? "chord" : "bass", fx: { smear: mode === "copenhagen" ? 0.4 : 0, pan: h.length > 1 ? -0.7 + (1.4 * i) / Math.max(1, h.length - 1) : 0 } })));
+  out.push({ midi: 100, t: 0, dur: 0.01, voice: mode === "grw" ? "thump" : "tick", vel: 0.06, role: "fx" });
+  return dress(out, { total: 1.8 });
 }
 
 // ---- builders for export -----------------------------------------------------------------

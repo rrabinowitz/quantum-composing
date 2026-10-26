@@ -3,6 +3,7 @@
 import { S, $, on, degMidi, rToMidi, harmMidi, beginPerformance, endPerformance } from "./world.js";
 import { rand, pass, look } from "./ket.js";
 import { note, runLoop, at, ac } from "./audio.js";
+import { dressRegister, SCORE_VOICES, READOUT_VOICES } from "./orch.js";
 import { wireExport } from "./export.js";
 
 const r2 = Math.SQRT1_2, C = (re, im = 0) => ({ re, im });
@@ -23,7 +24,7 @@ const TUNINGS = {
 };
 const INSTS = ["vibes", "glassbell", "kalimba", "bowl", "celesta", "harp", "pizz", "guitar", "marimba", "glass", "choir", "organ", "piano", "epiano", "theremin"];
 const ROWS = 16;
-const R = (S.reg = { nq: 3, tuning: "Harmonic series", inst: "glassbell", grid: [] });
+const R = (S.reg = { nq: 3, tuning: "Harmonic series", inst: "glassbell", readout: "bowl", second: "", grid: [] });
 const blank = () => (R.grid = Array.from({ length: R.nq }, () => new Array(ROWS).fill(null)));
 blank();
 const put = (q, r, g) => (R.grid[q][r] = g);
@@ -67,21 +68,27 @@ function step(sim, r) {
   if (Q.mode === "grw" && rand() < Q.grw * 0.15) { const q = Math.floor(rand() * R.nq); ev.push({ q, v: sim.measure(q), grw: true }); }
   return ev;
 }
-function rowNotes(sim, t, e8, ev, out) {
-  sim.probs().forEach((w, k) => { if (w >= 0.01) out.push({ midi: pitchOf(k), t, dur: e8 * 1.8, voice: R.inst, vel: 0.16 * Math.sqrt(w), fx: { pan: Math.sin(sim.phase(k)) * 0.8 } }); });
-  ev.forEach((e) => out.push({ midi: e.grw ? 36 : 100, t, dur: e.grw ? 0.3 : 0.01, voice: e.grw ? "thump" : "tick", vel: 0.05, fx: {} }));
+function rowNotes(sim, t, e8, ev, out, voice) {
+  sim.probs().forEach((w, k) => { if (w >= 0.01) out.push({ midi: pitchOf(k), t, dur: e8 * 1.8, voice, vel: 0.16 * Math.sqrt(w), role: "mel", fx: { pan: Math.sin(sim.phase(k)) * 0.8 } }); });
+  ev.forEach((e) => out.push({ midi: e.grw ? 36 : 100, t, dur: e.grw ? 0.3 : 0.01, voice: e.grw ? "thump" : "tick", vel: 0.05, role: "fx", fx: {} }));
 }
 function readout(sim, t, e8, out) {
   if (S.q.mode === "mwi") return null;
   const k = sim.readout();
-  out.push({ midi: pitchOf(k) + 12, t, dur: e8 * 4, voice: "bowl", vel: 0.16, fx: {} }, { midi: 100, t, dur: 0.01, voice: "tick", vel: 0.06, fx: {} });
+  out.push({ midi: pitchOf(k) + 12, t, dur: e8 * 4, voice: R.readout || "bowl", vel: 0.16, role: "readout", fx: {} }, { midi: 100, t, dur: 0.01, voice: "tick", vel: 0.06, role: "fx", fx: {} });
   return k;
 }
 export function buildRegister(loops = 2) {
   pass(8);
   const e8 = 30 / S.bpm, out = [];
-  for (let l = 0; l < loops; l++) { const sim = new Sim(R.nq); for (let r = 0; r < ROWS; r++) rowNotes(sim, (l * ROWS + r) * e8, e8, step(sim, r), out); readout(sim, (l + 1) * ROWS * e8 - e8 * 0.5, e8, out); }
-  return { notes: out, total: loops * ROWS * e8 + 2, bpm: S.bpm };
+  for (let l = 0; l < loops; l++) {
+    const voice = l > 0 && R.second ? R.second : R.inst;
+    const sim = new Sim(R.nq);
+    for (let r = 0; r < ROWS; r++) rowNotes(sim, (l * ROWS + r) * e8, e8, step(sim, r), out, voice);
+    readout(sim, (l + 1) * ROWS * e8 - e8 * 0.5, e8, out);
+  }
+  const total = loops * ROWS * e8 + 2;
+  return { notes: dressRegister(out, total), total, bpm: S.bpm };
 }
 
 // ---- view ----
@@ -95,6 +102,10 @@ export function initRegister() {
   $("regTune").onchange = (e) => { R.tuning = e.target.value; preview(true); };
   $("regInst").innerHTML = INSTS.map((s) => `<option ${s === R.inst ? "selected" : ""}>${s}</option>`).join("");
   $("regInst").onchange = (e) => { R.inst = e.target.value; preview(true); };
+  $("regRead").innerHTML = READOUT_VOICES.map((s) => `<option ${s === R.readout ? "selected" : ""}>${s}</option>`).join("");
+  $("regRead").onchange = (e) => { R.readout = e.target.value; preview(true); };
+  $("regSecond").innerHTML = `<option value="">same instrument</option>` + SCORE_VOICES.map((s) => `<option value="${s}">${s}</option>`).join("");
+  $("regSecond").onchange = (e) => { R.second = e.target.value; preview(true); };
   $("regAdd").onclick = () => { if (R.nq < 5) { R.nq++; R.grid.push(new Array(ROWS).fill(null)); preview(true); } };
   $("regRem").onclick = () => { if (R.nq > 1) { R.nq--; R.grid.pop(); R.grid.forEach((col) => col.forEach((c, i) => { if (c && (c.c >= R.nq || c.t >= R.nq)) col[i] = null; })); preview(true); } };
   $("regClear").onclick = () => { blank(); preview(); };

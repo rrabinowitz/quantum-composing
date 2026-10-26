@@ -67,7 +67,7 @@ export function initHistories() {
   $("mHalf").oninput = (e) => { S.meas.half = +e.target.value; $("mHalfV").textContent = S.meas.half ? S.meas.half + " bars" : "∞"; };
   $("histGo").onclick = () => (perf ? halt() : perform());
   $("histories").addEventListener("change", changed);
-  on("q", changed); on("ens", changed); on("links", changed);
+  on("q", changed); on("ens", changed); on("links", changed); on("orch", changed);
   wireExport($("histMidi"), $("histWav"), () => last || (last = record(buildHistory())), "history");
 }
 

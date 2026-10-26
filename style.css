@@ -34,6 +34,13 @@ body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Georgia,"I
 #links{position:absolute;top:100%;right:0;z-index:5;margin-top:6px;background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:10px 14px;display:flex;flex-direction:column;gap:6px;box-shadow:0 8px 24px #2a262222;font-size:14px}
 #links[hidden]{display:none}
 #links label{display:flex;gap:8px;align-items:center;cursor:pointer}
+.orch{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:8px 0 4px;padding:8px 0;border-top:1px solid var(--rule)}
+.orch-name{font-variant:small-caps;letter-spacing:.06em;color:var(--dim);font-size:13px}
+.orch .lbl{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:13px}
+.orch input[type=range]{width:88px}
+.orch select{padding:4px 8px}
+#orchHand{display:contents}
+#orchHand[hidden]{display:none}
 #note{font-style:italic;color:var(--dim);margin:10px 0 16px;max-width:760px;font-size:14px}
 button,select,input[type=number],input:not([type]){font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:6px 11px}
 button{cursor:pointer}button:hover{border-color:var(--ink)}
