@@ -6,6 +6,7 @@ import { initHistories } from "./histories.js";
 import { initOrbits } from "./orbits.js";
 import { initRegister } from "./register.js";
 import { bindStationVolumes, loadSamples, setActiveStation } from "./audio.js";
+import { initHelp } from "./help.js";
 
 document.querySelectorAll("#rail button").forEach((b) => (b.onclick = () => {
   document.querySelectorAll("#rail button").forEach((x) => x.classList.toggle("on", x === b));
@@ -22,3 +23,4 @@ initHistories();
 initOrbits();
 initRegister();
 loadSamples();
+initHelp();

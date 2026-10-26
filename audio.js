@@ -7,6 +7,7 @@ function cachedRender(sr, freq, dur, voice, fx) {
   const key = [
     voice, sr, Math.round(freq * 2), Math.round(dur * 20),
     fx.sample || "", fx.vowel || "", fx.open ? 1 : 0, fx.coh == null ? "" : Math.round(fx.coh * 10),
+    Math.round((fx.strike ?? 0.6) * 20),
   ].join(":");
   let wave = RENDER_CACHE.get(key);
   if (!wave) {
@@ -251,7 +252,7 @@ const SUSTAINED = new Set(["strings", "cello", "winds", "choir", "organ", "there
 export function note(midi, t, dur, voice = "piano", vel = 0.15, dest, fx = {}) {
   const c = dest ? dest.context : ac();
   dest = dest || stationInput();
-  fx = fx || {};
+  fx = { ...(fx || {}), strike: fx && fx.strike != null ? fx.strike : vel };
   let out = dest;
   if (fx.pan && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, fx.pan)); p.connect(dest); out = p; }
   const f = mtof(midi + (fx.detune || 0) / 100), env = c.createGain();

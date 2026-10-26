@@ -21,7 +21,7 @@ const TUNINGS = {
   "5-limit just": (k) => rToMidi([1, 9 / 8, 5 / 4, 4 / 3, 3 / 2, 5 / 3, 15 / 8][k % 7] * 2 ** Math.floor(k / 7)),
   "12-TET pentatonic": (k) => 62 + 12 * Math.floor(k / 5) + [0, 2, 4, 7, 9][k % 5],
 };
-const INSTS = ["vibes", "glassbell", "kalimba", "bowl", "celesta", "harp", "pizz", "guitar", "marimba", "glass", "choir", "organ", "epiano", "theremin"];
+const INSTS = ["vibes", "glassbell", "kalimba", "bowl", "celesta", "harp", "pizz", "guitar", "marimba", "glass", "choir", "organ", "piano", "epiano", "theremin"];
 const ROWS = 16;
 const R = (S.reg = { nq: 3, tuning: "Harmonic series", inst: "glassbell", grid: [] });
 const blank = () => (R.grid = Array.from({ length: R.nq }, () => new Array(ROWS).fill(null)));

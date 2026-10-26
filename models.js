@@ -5,10 +5,26 @@
  *   f_k = k f0 sqrt(1 + B k^2), B = π² E d² / (64 ρ L⁴ f²),
  *   with the Jaffe & Smith (1983) two-point loop loss |cos(π f / sr)|.
  *   Pluck amplitudes are the Fourier series sin(k π β) / k².
+ * Piano: the same transverse modes, a feedforward hammer whose contact
+ *   shortens from about 5 ms to 2 ms with strike speed (Askenfelt & Jansson),
+ *   one/two/three strings with a small unison detune, and longitudinal
+ *   partials at c_L / (2L), c_L = sqrt(E/ρ). That is the published modal
+ *   piano (Bank, AES e-brief), not a fitted commercial hammer curve.
  * Bow: Smith (1986) after McIntyre, Schumacher & Woodhouse (1983),
  *   with the Cook/Scavone bow table and the Maestre violin-body biquads.
- * Flue pipes: Cook jet polynomial x³ − x, jet delay, and a reflection filter.
- * Bars, membranes, cantilevers, bells: analytic modal frequencies.
+ * Flute: Cook jet polynomial x³ − x, jet delay, and a reflection filter.
+ *   Faust fluteModel is marked out of tune in physmodels.lib. A direct port
+ *   locks about an octave sharp, or goes silent, so winds stays the Cook jet.
+ * Organ: open-pipe partials k·f0. A single Cook jet was measured and does
+ *   not stay on the fundamental across a rank.
+ * Bars, glass, bowls: Essl & Cook banded-waveguide presets from STK.
+ *   Round-trip gain G decays as sigma = −ln(G)·f.
+ * Marimba: Faust marimbaBarModel, the mesh2faust modes of a C2 bar.
+ *   Ratios and position-0 gains are the library tables. T60 is
+ *   0.1·(1 − ratio/195.955)^5, so the bar is quiet after about a tenth
+ *   of a second. The resonator tube under that bar does not keep the
+ *   written pitch across this compass, so the sounding model is the bar.
+ * Membranes, cantilevers, bells: analytic modal frequencies.
  * No waveshaping. Peak scaling is linear.
  */
 
@@ -17,10 +33,18 @@ const STEEL_E = 2.0e11;
 const STEEL_RHO = 7800;
 
 const BAR = [1, 2.756538, 5.403917, 8.932951];
-const TUNED_BAR = [1, 4];
 const MEMBRANE = [1, 1.593340, 2.135548, 2.295417, 2.653066, 2.917295];
 const CANTILEVER = [1, 6.266893, 17.54748, 34.38606];
 const BELL = [0.5, 1, 1.189207, 1.498307, 2, 2.5, 3, 4];
+// Essl & Cook / STK BandedWG presets.
+const TUNED_BAR = [1, 4.0198391420, 10.7184986595, 18.0697050938];
+const GLASS_HARMONICA = [1, 2.32, 4.25, 6.63, 9.38];
+// Tibetan prayer bowl, STK BandedWG preset 3 (ICMC 2002). Gains of 1 are the
+// source values; the comments there are numbers so close to 1 that they are 1 in JS.
+const TIBETAN_BOWL = [0.996108344, 1.0038916562, 2.979178, 2.99329767, 5.704452, 5.704452, 8.9982, 9.01549726, 12.83303, 12.807382, 17.2808219, 21.97602739726];
+const BOWL_GAINS = [0.999925960128219, 0.999925960128219, 0.999982774366897, 0.999982774366897, 1, 1, 1, 1, 0.999965497558225, 0.999965497558225, 1, 1];
+const BOWL_EXC = [1.1900357, 1.1900357, 1.0914886, 1.0914886, 4.2995041, 4.2995041, 4.0063034, 4.0063034, 0.7063034, 0.7063034, 5.7063034, 5.7063034];
+const LONGITUDINAL = Math.sqrt(STEEL_E / STEEL_RHO);
 
 const STRINGS = {
   guitar: { L: 0.648, fRef: 329.63, d: 2.54e-4, beta: 1 / 5 },
@@ -142,6 +166,117 @@ function stiffString(sr, freq, dur, spec) {
 
 export function pluck(sr, freq, dur) {
   return stiffString(sr, freq, dur, STRINGS.guitar);
+}
+
+/**
+ * Modal piano. Unison cents are a voicing of about one cent: the published
+ * model asks for slightly detuned copies, and does not publish the cents.
+ * Longitudinal decay gets an extra 4/s so the clang sits in the attack.
+ */
+function pianoNote(sr, freq, dur, strike) {
+  const spec = STRINGS.piano;
+  const v = Math.max(0, Math.min(1, strike ?? 0.6));
+  const contact = 0.005 - 0.003 * v;
+  const f0 = Math.max(30, freq);
+  const cents = f0 < 65 ? [0] : f0 < 131 ? [-0.8, 0.8] : [-1.2, 0, 1.3];
+  const seconds = Math.min(6, Math.max(0.35, dur + 1.6));
+  const n = Math.floor(sr * seconds);
+  const modes = [];
+  for (let s = 0; s < cents.length; s += 1) {
+    const fString = f0 * 2 ** (cents[s] / 1200);
+    const B = inharmonicity(spec, fString);
+    for (let k = 1; k <= 40; k += 1) {
+      if (B * k * k > 25) break;
+      const fk = k * fString * Math.sqrt(1 + B * k * k);
+      if (fk >= sr * 0.45) break;
+      let amp = Math.sin(k * Math.PI * spec.beta) / (k * k);
+      const x = Math.PI * fk * contact;
+      amp *= x < 1e-4 ? 1 : Math.sin(x) / x;
+      modes.push({ freq: fk, amp, sigma: loopSigma(sr, fString, fk) });
+    }
+  }
+  const L = f0 >= spec.fRef ? spec.L * spec.fRef / f0 : spec.L;
+  const fL = LONGITUDINAL / (2 * L);
+  const longAmp = 0.1 * v * v;
+  for (let mult = 1; mult <= 2; mult += 1) {
+    const fk = fL * mult;
+    if (fk >= sr * 0.45 || fk < 30) continue;
+    const x = Math.PI * fk * contact;
+    const sinc = x < 1e-4 ? 1 : Math.sin(x) / x;
+    modes.push({ freq: fk, amp: (longAmp * sinc) / mult, sigma: loopSigma(sr, f0, fk) + 4 });
+  }
+  return finish(modalSum(sr, n, modes, { strike: true }), sr, 0.45);
+}
+
+// Faust physmodels.lib marimbaBarModel, excitation position 0 (the library default).
+const MARIMBA_RATIOS = [1, 3.31356, 3.83469, 8.06313, 9.44778, 14.1169, 18.384, 21.0102, 26.1775, 28.9944, 37.0728, 37.8703, 40.0634, 47.6439, 51.019, 52.43, 58.286, 63.5486, 65.3628, 66.9587, 74.5301, 78.692, 80.8375, 89.978, 92.9661, 95.1914, 97.4807, 110.62, 112.069, 113.826, 119.356, 127.045, 129.982, 132.259, 133.477, 144.549, 149.438, 152.033, 153.166, 155.597, 158.183, 168.105, 171.863, 174.464, 178.937, 181.482, 185.398, 190.369, 192.19, 195.505];
+const MARIMBA_GAINS = [1, 0.776725, 0.625723, 0.855223, 0.760159, 0.698373, 0.768011, 0.641127, 0.244034, 0.707754, 0.634013, 0.247527, 0.660849, 0.450396, 0.567783, 0.106361, 0.716814, 0.66392, 0.291208, 0.310599, 0.801495, 0.635292, 0.307435, 0.874124, 0.497668, 0.487088, 0.459115, 0.733455, 0.541818, 0.441318, 0.31392, 0.40309, 0.685353, 0.60314, 0.400552, 0.453511, 0.634386, 0.291547, 0.131605, 0.368507, 0.839907, 0.60216, 0.288296, 0.57967, 0.0242493, 0.262746, 0.368588, 0.890284, 0.408963, 0.556072];
+
+/** Faust marimbaBarModel at excitation position 0. The tube is not used. */
+function faustMarimba(sr, freq, dur) {
+  const f0 = Math.max(45, freq);
+  const seconds = Math.min(2, Math.max(0.2, dur + 0.15));
+  const n = Math.floor(sr * seconds);
+  const modes = [];
+  for (let i = 0; i < MARIMBA_RATIOS.length; i += 1) {
+    const fk = f0 * MARIMBA_RATIOS[i];
+    if (fk >= sr * 0.45) continue;
+    const base = 1 - MARIMBA_RATIOS[i] / 195.955;
+    const t60 = 0.1 * (base > 0 ? base ** 5 : 0.01);
+    modes.push({ freq: fk, amp: MARIMBA_GAINS[i], sigma: Math.log(1000) / Math.max(0.01, t60) });
+  }
+  return finish(modalSum(sr, n, modes, { strike: true }), sr, 0.45);
+}
+
+/** Essl & Cook loop: one pass around a mode of frequency f multiplies by G. */
+function loopModes(sr, freq, dur, ratios, gains, ring, exc) {
+  const f0 = Math.min(1568, Math.max(40, freq));
+  const seconds = Math.min(6, Math.max(0.1, dur + ring));
+  const n = Math.floor(sr * seconds);
+  const modes = [];
+  for (let i = 0; i < ratios.length; i += 1) {
+    const fk = f0 * ratios[i];
+    if (fk >= sr * 0.45 || fk < 20) continue;
+    const amp = exc ? exc[i] : 1;
+    if (!amp) continue;
+    const G = Math.min(0.99999, Math.max(0.5, gains[i]));
+    modes.push({ freq: fk, amp, sigma: -Math.log(G) * fk });
+  }
+  return finish(modalSum(sr, n, modes, { strike: true }), sr, 0.45);
+}
+
+function tunedBar(sr, freq, dur, baseGain, ring) {
+  const gains = TUNED_BAR.map((_, i) => baseGain ** (i + 1));
+  return loopModes(sr, freq, dur, TUNED_BAR, gains, ring);
+}
+
+function openPipe(sr, freq, dur) {
+  const f0 = Math.max(40, freq);
+  const seconds = Math.min(8, Math.max(0.2, dur + 0.28));
+  const n = Math.floor(sr * seconds);
+  const modes = [];
+  for (let k = 1; k <= 16; k += 1) {
+    const fk = k * f0;
+    if (fk >= sr * 0.45) break;
+    modes.push({ freq: fk, amp: 1 / k ** 1.15, sigma: 0 });
+  }
+  const out = modalSum(sr, n, modes);
+  const on = Math.floor(sr * Math.max(0.05, dur));
+  const attackN = Math.max(1, Math.floor(sr * 0.02));
+  let seed = 0x12345678;
+  for (let i = 0; i < n; i += 1) {
+    let env;
+    if (i < attackN) env = i / attackN;
+    else if (i < on) env = 1;
+    else env = Math.exp(-(i - on) / (sr * 0.12));
+    let chiff = 0;
+    if (i < sr * 0.035) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      chiff = (seed / 4294967296 * 2 - 1) * 0.4 * Math.exp(-i / (sr * 0.01));
+    }
+    out[i] = (out[i] + chiff) * env;
+  }
+  return finish(out, sr, 0.45);
 }
 
 class Line {
@@ -436,9 +571,9 @@ function snare(sr) {
 }
 
 const LOUDNESS = {
-  winds: 0.423, kick: 0.536, thump: 0.536, glass: 0.705, organ: 0.912,
-  theremin: 0.493, kalimba: 0.604, vibes: 0.569, pilot: 0.568, celesta: 0.605,
-  marimba: 0.694, bowl: 0.705, piano: 0.540, glassbell: 0.705, woodblock: 0.846,
+  winds: 0.423, kick: 0.536, thump: 0.536, glass: 0.895, organ: 1.067,
+  theremin: 0.493, kalimba: 0.604,   vibes: 0.876, pilot: 0.568, celesta: 1.045,
+  marimba: 3.616, bowl: 0.941, piano: 0.599, glassbell: 0.895, woodblock: 0.846,
   choir: 0.576, epiano: 0.612, gong: 0.704, strings: 0.547, bowedmetal: 0.547,
   tom: 1.519, reverse: 0.547, ksdrum: 1.769, noise: 1.159, bass: 0.647,
   pizz: 0.695, pluck: 0.695, guitar: 0.630, snare: 1.316, cello: 0.547,
@@ -478,7 +613,7 @@ function synthesize(sr, freq, dur, voice, fx = {}) {
     case "bass":
       return stiffString(sr, f, d, STRINGS.bass);
     case "piano":
-      return stiffString(sr, f, d, STRINGS.piano);
+      return pianoNote(sr, f, d, fx.strike);
     case "epiano":
       return cantilever(sr, f, d, 280, 1.2);
     case "kalimba":
@@ -492,7 +627,7 @@ function synthesize(sr, freq, dur, voice, fx = {}) {
     case "choir":
       return choir(sr, f, d, fx.vowel || "a");
     case "organ":
-      return flute(sr, f, d, { noise: 0.05, vib: 1.2, vibGain: 0.008, pressure: 0.75, attack: 0.025, jetRatio: 0.32, cutoffRatio: 3.5 });
+      return openPipe(sr, f, d);
     case "theremin":
       return tone(sr, f, d, [{ ratio: 1, amp: 1 }]);
     case "pilot":
@@ -503,16 +638,19 @@ function synthesize(sr, freq, dur, voice, fx = {}) {
       return waved;
     }
     case "vibes":
-      return resonator(sr, f, d, TUNED_BAR, 500, { ring: 2.6, amps: [1, 0.22] });
+      // STK tuned-bar frequencies. 0.999 is that preset's round-trip gain.
+      return tunedBar(sr, f, d, 0.999, 2.8);
     case "marimba":
-      return resonator(sr, f, d, TUNED_BAR, 70, { ring: 0.7, amps: [1, 0.18] });
+      return faustMarimba(sr, f, d);
     case "celesta":
-      return resonator(sr, f, d, TUNED_BAR, 180, { ring: 1.6, amps: [1, 0.2] });
+      return tunedBar(sr, f, d, 0.996, 1.6);
     case "glass":
     case "glassbell":
-    case "gong":
+      return loopModes(sr, f, d, GLASS_HARMONICA, GLASS_HARMONICA.map((_, i) => 0.999 ** (i + 1)), 2.2);
     case "bowl":
-      return resonator(sr, f, d, BELL, voice === "gong" ? 400 : voice === "bowl" ? 700 : 500, { ring: voice === "bowl" ? 3.2 : 2.4 });
+      return loopModes(sr, f, d, TIBETAN_BOWL, BOWL_GAINS, 3.4, BOWL_EXC);
+    case "gong":
+      return resonator(sr, f, d, BELL, 400, { ring: 2.4 });
     case "kick":
     case "thump":
       return resonator(sr, 52, 0.4, MEMBRANE, 14, { ring: 0.35, chirp: 0.8, amps: [1, 0.35, 0.15, 0.08, 0.05, 0.03], peak: 0.55 });

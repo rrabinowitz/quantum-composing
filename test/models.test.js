@@ -75,6 +75,48 @@ test("voices share a loudness level", () => {
   assert.ok(Math.max(guitar, hat) / Math.min(guitar, hat) < 1.6);
 });
 
+test("organ speaks the written pitch", () => {
+  const sr = 48000;
+  for (const midi of [36, 60, 84]) {
+    const freq = 440 * 2 ** ((midi - 69) / 12);
+    const wave = renderVoice(sr, freq, 0.5, "organ");
+    const tone = (f) => {
+      const w = 2 * Math.PI * f / sr;
+      let re = 0;
+      let im = 0;
+      const a = Math.floor(sr * 0.12);
+      const b = Math.floor(sr * 0.4);
+      for (let n = a; n < b; n += 1) {
+        re += wave[n] * Math.cos(w * n);
+        im -= wave[n] * Math.sin(w * n);
+      }
+      return Math.hypot(re, im);
+    };
+    assert.ok(tone(freq) > tone(2 * freq) * 1.5, `midi ${midi}`);
+  }
+});
+
+test("marimba speaks the written pitch", () => {
+  const sr = 48000;
+  for (const midi of [48, 62, 76]) {
+    const freq = 440 * 2 ** ((midi - 69) / 12);
+    const wave = renderVoice(sr, freq, 0.35, "marimba");
+    const tone = (f) => {
+      const w = 2 * Math.PI * f / sr;
+      let re = 0;
+      let im = 0;
+      const b = Math.floor(sr * 0.08);
+      for (let n = 0; n < b; n += 1) {
+        re += wave[n] * Math.cos(w * n);
+        im -= wave[n] * Math.sin(w * n);
+      }
+      return Math.hypot(re, im);
+    };
+    assert.ok(tone(freq) > tone(freq * 3.31356), `midi ${midi}`);
+    assert.ok(wave.every((x) => Number.isFinite(x)));
+  }
+});
+
 test("every ensemble voice renders", () => {
   for (const voice of ["vibes", "pizz", "cello", "guitar", "choir", "gong", "reverse", "piano"]) {
     const wave = renderVoice(44100, 311, 0.25, voice);

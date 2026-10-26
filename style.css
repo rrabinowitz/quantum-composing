@@ -2,7 +2,27 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Georgia,"Iowan Old Style",serif;min-height:100vh;display:flex;
   background-image:radial-gradient(#2a26220c 1px,transparent 1px);background-size:18px 18px}
-#rail{position:sticky;top:0;height:100dvh;display:flex;flex-direction:column;gap:2px;padding:22px 0;border-right:1px solid var(--rule);background:#efe8da;min-width:96px}
+#rail{position:sticky;top:3.5rem;height:calc(100dvh - 3.5rem);display:flex;flex-direction:column;gap:2px;padding:22px 0;border-right:1px solid var(--rule);background:#efe8da;min-width:96px;z-index:2}
+.site-chrome button,.site-footer button{font:inherit;color:#000;background:transparent;border:0;border-radius:0;padding:0}
+.mast{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:8px 18px;margin:0 0 8px}
+.mast h1{margin:0;font-size:28px;font-weight:400;letter-spacing:.01em;line-height:1.1}
+.info-nav{display:flex;gap:18px;align-items:flex-start}
+.info-menu{position:relative}
+.info-menu summary{display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 0;color:var(--dim);cursor:pointer;list-style:none;white-space:nowrap}
+.info-menu summary::-webkit-details-marker{display:none}
+.info-menu summary:hover,.info-menu[open] summary{color:var(--accent)}
+.info-menu summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.chevron{width:7px;height:7px;margin-top:-3px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg)}
+.info-menu[open] .chevron{margin-top:3px;transform:rotate(225deg)}
+.info-panel{position:absolute;z-index:40;top:calc(100% + 8px);right:0;width:min(440px,calc(100vw - 32px));max-height:min(70vh,560px);overflow:auto;-webkit-overflow-scrolling:touch;padding:18px 20px;background:var(--card);border:1px solid var(--rule);border-radius:6px;box-shadow:0 12px 28px #2a262222}
+.info-panel h2{margin:12px 0 10px;font-size:22px;font-weight:400}
+.info-panel p,.help-list{color:var(--dim);font-size:14px}
+.help-list{margin:0 0 12px;padding-left:1.2em}
+.help-list li{margin:0 0 8px}
+.info-panel .lbl{margin-bottom:6px}
+#theory{width:100%;margin-bottom:4px}
+.help-keys{font-size:13px}
+.info-panel kbd{display:inline-block;min-width:1.1em;padding:0 5px;border:1px solid var(--rule);border-radius:3px;background:var(--paper);font:13px/1.4 Georgia,serif}
 #rail button{background:none;border:0;border-left:3px solid transparent;padding:12px 14px;min-height:44px;text-align:left;cursor:pointer;color:var(--dim);font:inherit;display:flex;flex-direction:column}
 #rail b{font-size:20px;font-weight:400;letter-spacing:.04em}
 #rail span{font-size:12px;font-style:italic}
@@ -100,7 +120,9 @@ input[type=range]{accent-color:var(--ink)}
 .regAmps{flex:1 1 300px;min-width:240px;display:block}
 @media(max-width:720px){
   body{flex-direction:column}
-  #rail{position:static;height:auto;flex-direction:row;justify-content:center;padding:6px;border-right:0;border-bottom:1px solid var(--rule)}
+  #rail{position:static;top:auto;height:auto;flex-direction:row;justify-content:center;padding:6px;border-right:0;border-bottom:1px solid var(--rule)}
+  .mast h1{font-size:22px}
+  .info-panel{position:fixed;top:4.5rem;left:16px;right:16px;width:auto}
   #rail button{border-left:0;border-bottom:3px solid transparent;align-items:center;padding:6px 10px}
   #rail button.on{border-color:var(--accent)}
   #page{padding:12px}
