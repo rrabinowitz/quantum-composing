@@ -1,30 +1,47 @@
-/** Waveguide and modal synthesis. Returns a mono Float32Array at `sr`. */
+/**
+ * Physical models, rendered to a mono Float32Array at `sr`.
+ *
+ * Strings: Morse stiff-string partials (Fletcher & Rossing)
+ *   f_k = k f0 sqrt(1 + B k^2), B = π² E d² / (64 ρ L⁴ f²),
+ *   with the Jaffe & Smith (1983) two-point loop loss |cos(π f / sr)|.
+ *   Pluck amplitudes are the Fourier series sin(k π β) / k².
+ * Bow: Smith (1986) after McIntyre, Schumacher & Woodhouse (1983),
+ *   with the Cook/Scavone bow table and the Maestre violin-body biquads.
+ * Flue pipes: Cook jet polynomial x³ − x, jet delay, and a reflection filter.
+ * Bars, membranes, cantilevers, bells: analytic modal frequencies.
+ * No waveshaping. Peak scaling is linear.
+ */
 
 const TAU = Math.PI * 2;
+const STEEL_E = 2.0e11;
+const STEEL_RHO = 7800;
 
-class FracDelay {
-  constructor(max) {
-    this.buf = new Float32Array(max);
-    this.w = 0;
-    this.max = max;
-  }
+const BAR = [1, 2.756538, 5.403917, 8.932951];
+const TUNED_BAR = [1, 4];
+const MEMBRANE = [1, 1.593340, 2.135548, 2.295417, 2.653066, 2.917295];
+const CANTILEVER = [1, 6.266893, 17.54748, 34.38606];
+const BELL = [0.5, 1, 1.189207, 1.498307, 2, 2.5, 3, 4];
 
-  push(x) {
-    this.buf[this.w] = x;
-    this.w += 1;
-    if (this.w >= this.max) this.w = 0;
-  }
+const STRINGS = {
+  guitar: { L: 0.648, fRef: 329.63, d: 2.54e-4, beta: 1 / 5 },
+  harp: { L: 1.0, fRef: 220, d: 8.0e-4, beta: 1 / 7 },
+  pizz: { L: 0.69, fRef: 65.41, d: 4.0e-4, beta: 1 / 6 },
+  bass: { L: 0.864, fRef: 41.2, d: 5.0e-4, beta: 0.2 },
+  piano: { L: 0.62, fRef: 261.63, d: 9.5e-4, beta: 1 / 8, contact: 0.0025 },
+};
 
-  read(samplesAgo) {
-    let r = this.w - samplesAgo;
-    r %= this.max;
-    if (r < 0) r += this.max;
-    const i0 = Math.floor(r);
-    const frac = r - i0;
-    const i1 = (i0 + 1) % this.max;
-    const a = this.buf[i0];
-    return a + (this.buf[i1] - a) * frac;
-  }
+function inharmonicity(spec, freq) {
+  const L = freq >= spec.fRef ? spec.L * spec.fRef / freq : spec.L;
+  const f = freq >= spec.fRef ? spec.fRef : freq;
+  return (Math.PI ** 2 * STEEL_E * spec.d ** 2) / (64 * STEEL_RHO * L ** 4 * f * f);
+}
+
+/** Jaffe & Smith two-point average, S = 1/2. Amplitude decay rate of a partial. */
+function loopSigma(sr, f0, fk) {
+  const g = Math.abs(Math.cos(Math.PI * fk / sr));
+  if (g > 0.999999) return 0;
+  if (g < 1e-4) return 1e4;
+  return -f0 * Math.log(g);
 }
 
 function dcBlock(out) {
@@ -39,29 +56,23 @@ function dcBlock(out) {
   }
 }
 
-function normalize(out, peak = 0.7) {
+function fadeTail(out, sr) {
+  const n = Math.min(out.length, Math.floor(sr * 0.015));
+  for (let i = 0; i < n; i += 1) out[out.length - 1 - i] *= i / n;
+}
+
+function peakScale(out, peak = 0.45) {
   let max = 1e-8;
   for (let i = 0; i < out.length; i += 1) max = Math.max(max, Math.abs(out[i]));
   const g = peak / max;
-  for (let i = 0; i < out.length; i += 1) {
-    const y = out[i] * g;
-    out[i] = Math.tanh(y);
-  }
+  for (let i = 0; i < out.length; i += 1) out[i] *= g;
+  return out;
 }
 
-function biquadPeaking(sr, freq, q, gainDb) {
-  const A = 10 ** (gainDb / 40);
-  const w = TAU * Math.min(freq, sr * 0.45) / sr;
-  const sn = Math.sin(w);
-  const cs = Math.cos(w);
-  const alpha = sn / (2 * q);
-  const b0 = 1 + alpha * A;
-  const b1 = -2 * cs;
-  const b2 = 1 - alpha * A;
-  const a0 = 1 + alpha / A;
-  const a1 = -2 * cs;
-  const a2 = 1 - alpha / A;
-  return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0 };
+function finish(out, sr, peak = 0.45) {
+  dcBlock(out);
+  fadeTail(out, sr);
+  return peakScale(out, peak);
 }
 
 function biquadBandpass(sr, freq, q) {
@@ -69,12 +80,8 @@ function biquadBandpass(sr, freq, q) {
   const sn = Math.sin(w);
   const cs = Math.cos(w);
   const alpha = sn / (2 * q);
-  const b0 = alpha;
-  const b2 = -alpha;
   const a0 = 1 + alpha;
-  const a1 = -2 * cs;
-  const a2 = 1 - alpha;
-  return { b0: b0 / a0, b1: 0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0 };
+  return { b0: alpha / a0, b1: 0, b2: -alpha / a0, a1: (-2 * cs) / a0, a2: (1 - alpha) / a0 };
 }
 
 function applyBiquad(out, coeff) {
@@ -93,229 +100,271 @@ function applyBiquad(out, coeff) {
   }
 }
 
-const BODIES = {
-  guitar: [[98, 1.1, 7], [210, 2.2, 5], [390, 3, 2]],
-  cello: [[180, 1.4, 6], [360, 2, 3.5], [700, 1.5, 1.5]],
-  harp: [[140, 1.2, 4], [320, 2, 2]],
-  flute: [[800, 1.6, 3], [1800, 1.2, 2]],
-  piano: [[90, 0.9, 5], [250, 1.4, 3]],
-};
-
-function body(out, sr, kind) {
-  for (const [freq, q, db] of BODIES[kind] || []) applyBiquad(out, biquadPeaking(sr, freq, q, db));
-}
-
-function finish(out, sr, kind, peak = 0.62) {
-  if (kind) body(out, sr, kind);
-  dcBlock(out);
-  normalize(out, peak);
+function modalSum(sr, n, modes, { strike = false, chirp = 0 } = {}) {
+  const out = new Float32Array(n);
+  const states = modes.map((mode) => ({ ...mode, phase: 0 }));
+  for (let i = 0; i < n; i += 1) {
+    const t = i / sr;
+    let y = 0;
+    for (let k = 0; k < states.length; k += 1) {
+      const mode = states[k];
+      const bend = chirp ? 1 + chirp * Math.exp(-t / 0.05) : 1;
+      const env = mode.sigma > 0 ? Math.exp(-mode.sigma * t) : 1;
+      y += mode.amp * env * (strike ? Math.sin(mode.phase) : Math.cos(mode.phase));
+      mode.phase += TAU * mode.freq * bend / sr;
+      if (mode.phase > TAU) mode.phase -= TAU;
+    }
+    out[i] = y;
+  }
   return out;
 }
 
-/** Karplus–Strong string with loop filter, stiffness allpass, and a pick-position comb. */
-export function pluck(sr, freq, dur, opt = {}) {
-  const f = Math.max(40, freq);
-  const period = Math.max(2, sr / f);
-  const seconds = Math.min(4.5, Math.max(0.4, dur + (opt.ring ?? 1.5)));
-  const n = Math.floor(sr * seconds);
-  const out = new Float32Array(n);
-  const delay = new FracDelay(Math.ceil(period) + 16);
-  const excite = Math.floor(period);
-  for (let i = 0; i < excite; i += 1) {
-    const window = Math.sin(Math.PI * i / excite);
-    delay.push((Math.random() * 2 - 1) * window);
-  }
-  const bright = opt.bright ?? 0.62;
-  const trip = opt.trip ?? 0.994;
-  const gain = trip ** (1 / period);
-  const stiff = opt.stiff ?? 0.12;
-  const ap = stiff / (1 + stiff);
-  const pick = Math.max(1, period * (opt.pick ?? 0.17));
-  let last = 0;
-  let apState = 0;
-  let apIn = 0;
-  for (let i = 0; i < n; i += 1) {
-    const x = delay.read(period);
-    const filtered = (1 - bright) * last + bright * x;
-    last = x;
-    const dispersed = ap * (filtered - apState) + apIn;
-    apIn = filtered;
-    apState = dispersed;
-    const y = dispersed * gain;
-    delay.push(y);
-    const comb = y - 0.28 * delay.read(pick);
-    out[i] = comb;
-  }
-  return finish(out, sr, opt.body || "guitar", opt.peak ?? 0.6);
-}
-
-/** Two-delay bowed string. Bow velocity drops after `dur`, then the string rings. */
-export function bow(sr, freq, dur, opt = {}) {
-  const f = Math.max(50, freq);
-  const period = Math.max(8, sr / f);
-  const seconds = Math.min(8, Math.max(0.2, dur + 0.45));
-  const n = Math.floor(sr * seconds);
-  const out = new Float32Array(n);
-  const bowAt = Math.min(0.45, Math.max(0.07, opt.position ?? 0.14));
-  const nutLen = Math.max(2, period * bowAt);
-  const bridgeLen = Math.max(2, period * (1 - bowAt));
-  const nut = new FracDelay(Math.ceil(nutLen) + 8);
-  const bridge = new FracDelay(Math.ceil(bridgeLen) + 8);
-  const pressure = opt.pressure ?? 0.75;
-  const bowSpeed = opt.velocity ?? 0.22;
-  const bright = opt.brightness ?? 0.4;
-  const pole = 0.2 + (1 - bright) * 0.45;
-  const on = Math.floor(sr * Math.max(0.06, dur));
-  let low = 0;
-  for (let i = 0; i < n; i += 1) {
-    const attack = Math.min(1, i / (sr * 0.035));
-    const release = i < on ? 1 : Math.max(0, 1 - (i - on) / (sr * 0.09));
-    const gate = attack * release;
-    const fromNut = nut.read(nutLen);
-    const fromBridge = bridge.read(bridgeLen);
-    const stringVel = fromNut + fromBridge;
-    const delta = bowSpeed * gate - stringVel;
-    const slope = 0.8 + pressure * 6;
-    const table = (slope * delta) / (1 + Math.abs(slope * delta));
-    const force = table * (0.35 + pressure) * (0.25 + 0.75 * gate);
-    nut.push((-fromBridge + force) * 0.992);
-    const towardBridge = fromNut + force;
-    low = (1 - pole) * towardBridge + pole * low;
-    bridge.push(-low * 0.996);
-    out[i] = low;
-  }
-  return finish(out, sr, opt.body || "cello", 0.55);
-}
-
-/** Jet-driven cylindrical bore. Pitch is the round-trip delay. */
-export function flute(sr, freq, dur, opt = {}) {
-  const f = Math.max(80, freq);
-  const period = Math.max(8, sr / f);
-  const seconds = Math.min(8, Math.max(0.15, dur + 0.28));
-  const n = Math.floor(sr * seconds);
-  const out = new Float32Array(n);
-  const bore = new FracDelay(Math.ceil(period) + 16);
-  const on = Math.floor(sr * Math.max(0.05, dur));
-  const vib = opt.vib ?? 5.1;
-  const breath = opt.breath ?? 0.62;
-  let tone = 0;
-  for (let i = 0; i < n; i += 1) {
-    const attack = Math.min(1, i / (sr * 0.04));
-    const release = i < on ? 1 : Math.max(0, 1 - (i - on) / (sr * 0.07));
-    const gate = attack * release;
-    const vibDelay = period / (1 + 0.006 * Math.sin((TAU * vib * i) / sr));
-    const y = bore.read(vibDelay);
-    const noise = (Math.random() * 2 - 1) * 0.05 * gate;
-    const jetIn = breath * gate + noise - 0.42 * y;
-    const jet = Math.tanh(2.2 * jetIn);
-    bore.push(jet * 0.48 + y * 0.5);
-    tone = tone * 0.62 + y * 0.38;
-    out[i] = tone;
-  }
-  return finish(out, sr, "flute", 0.58);
-}
-
-const MODE_PRESETS = {
-  bar: [1, 2.756, 5.404, 8.933],
-  membrane: [1, 1.594, 2.136, 2.296, 2.653, 2.918],
-  metal: [1, 1.42, 1.93, 2.47, 2.88, 3.36, 3.79, 4.5],
-  bowl: [1, 2.0, 2.71, 5.15, 8.43],
-  glass: [1, 2.32, 4.25, 6.63, 9.38],
-  wood: [1, 2.572, 4.644],
-  tine: [1, 5.9, 13.5],
-};
-
-/** Struck resonator. Each mode is a pair of slightly detuned exponentials plus a noise strike. */
-export function modal(sr, freq, dur, opt = {}) {
+function stiffString(sr, freq, dur, spec) {
   const f0 = Math.max(30, freq);
-  const ratios = opt.modes || MODE_PRESETS.bar;
-  const q = opt.q ?? 280;
-  const seconds = Math.min(6, Math.max(0.2, dur + (opt.ring ?? 2.2)));
+  const B = inharmonicity(spec, f0);
+  const seconds = Math.min(6, Math.max(0.35, dur + 1.4));
   const n = Math.floor(sr * seconds);
-  const out = new Float32Array(n);
-  const amps = ratios.map((_, k) => (opt.amps ? opt.amps[k] ?? 0 : 1 / (1 + k)));
-  const ampSum = amps.reduce((a, b) => a + b, 0) || 1;
-  ratios.forEach((ratio, k) => {
-    const f = f0 * ratio;
-    if (f > sr * 0.45) return;
-    const qk = Array.isArray(q) ? q[k] ?? q[q.length - 1] : q / (1 + k * 0.18);
-    const tau = Math.max(0.012, Math.min(5, qk / (Math.PI * f)));
-    const beat = 0.4 + (k % 3) * 0.35;
-    const amp = amps[k] / ampSum;
-    const d1 = TAU * f / sr;
-    const d2 = TAU * (f + beat) / sr;
-    const decay = Math.exp(-1 / (sr * tau));
-    const hitDecay = Math.exp(-1 / (sr * 0.004));
-    let p1 = 0;
-    let p2 = 0;
-    let env = 1;
-    let hit = 1;
-    for (let i = 0; i < n; i += 1) {
-      out[i] += amp * env * (Math.sin(p1) * 0.82 + Math.sin(p2) * 0.18);
-      if (k === 0) out[i] += (Math.random() * 2 - 1) * hit * 0.15;
-      p1 += d1;
-      p2 += d2;
-      if (p1 > TAU) p1 -= TAU;
-      if (p2 > TAU) p2 -= TAU;
-      env *= decay;
-      hit *= hitDecay;
+  const beta = spec.beta;
+  const modes = [];
+  for (let k = 1; k <= 48; k += 1) {
+    if (B * k * k > 25) break;
+    const fk = k * f0 * Math.sqrt(1 + B * k * k);
+    if (fk >= sr * 0.45) break;
+    let amp = Math.sin(k * Math.PI * beta) / (k * k);
+    if (spec.contact) {
+      const x = Math.PI * fk * spec.contact;
+      amp *= x < 1e-4 ? 1 : Math.sin(x) / x;
     }
-  });
-  if (opt.pitchDrop) {
-    // Re-render the fundamental with a short downward chirp mixed in.
-    const drop = opt.pitchDrop;
-    for (let i = 0; i < Math.min(n, Math.floor(sr * 0.2)); i += 1) {
-      const t = i / sr;
-      const f = f0 * (1 + drop * Math.exp(-t / 0.05));
-      out[i] += Math.sin(TAU * f * t) * Math.exp(-t / 0.12) * 0.8;
-    }
+    modes.push({ freq: fk, amp, sigma: loopSigma(sr, f0, fk) });
   }
-  return finish(out, sr, null, opt.peak ?? 0.6);
+  return finish(modalSum(sr, n, modes, { strike: !!spec.contact }), sr, 0.45);
 }
 
-/** Inharmonic stiff string, hammer noise, and a short soundboard resonance. */
-export function piano(sr, freq, dur) {
-  const B = freq < 120 ? 0.00015 : 0.0004;
-  const modes = [];
-  for (let k = 1; k <= 18; k += 1) {
-    const ratio = k * Math.sqrt(1 + B * k * k);
-    if (freq * ratio > sr * 0.45) break;
-    modes.push(ratio);
+export function pluck(sr, freq, dur) {
+  return stiffString(sr, freq, dur, STRINGS.guitar);
+}
+
+class Line {
+  constructor(maxDelay) {
+    this.n = Math.ceil(maxDelay) + 8;
+    this.buf = new Float32Array(this.n);
+    this.w = 0;
+    this.last = 0;
   }
-  const q = modes.map((_, k) => 180 + 900 / (k + 1));
-  const amps = modes.map((_, k) => 1 / (k + 1) ** 0.85);
-  const out = modal(sr, freq, dur, { modes, q, amps, ring: 2.4, peak: 0.7 });
-  return finish(out, sr, "piano", 0.62);
+
+  lastOut() { return this.last; }
+
+  tick(input, delay) {
+    const d = Math.min(this.n - 4, Math.max(2, delay));
+    let r = this.w - d;
+    r %= this.n;
+    if (r < 0) r += this.n;
+    const i0 = Math.floor(r);
+    const frac = r - i0;
+    const at = (k) => this.buf[(i0 + k + this.n) % this.n];
+    const xm = at(-1);
+    const x0 = at(0);
+    const x1 = at(1);
+    const x2 = at(2);
+    const y = (-frac * (frac - 1) * (frac - 2) / 6) * xm
+      + ((frac + 1) * (frac - 1) * (frac - 2) / 2) * x0
+      + (-(frac + 1) * frac * (frac - 2) / 2) * x1
+      + ((frac + 1) * frac * (frac - 1) / 6) * x2;
+    this.buf[this.w] = input;
+    this.w += 1;
+    if (this.w >= this.n) this.w = 0;
+    this.last = y;
+    return y;
+  }
+}
+
+class OnePole {
+  constructor(pole, gain) {
+    this.b0 = gain * (pole > 0 ? 1 - pole : 1 + pole);
+    this.pole = pole;
+    this.y1 = 0;
+  }
+
+  tick(x) {
+    const y = this.b0 * x + this.pole * this.y1;
+    this.y1 = y;
+    return y;
+  }
+}
+
+function onePolePhaseDelay(pole, freq, sr) {
+  const w = TAU * freq / sr;
+  const arg = -Math.atan2(pole * Math.sin(w), 1 - pole * Math.cos(w));
+  return -arg / w;
+}
+
+/** Smith bow table: reflection coefficient from differential velocity. */
+function bowTable(delta, slope, offset) {
+  const x = Math.abs((delta + offset) * slope) + 0.75;
+  return Math.min(0.98, Math.max(0.01, x ** -4));
+}
+
+const VIOLIN_BODY = [
+  [1, 1.5667, 0.3133, -0.5509, -0.3925],
+  [1, -1.9537, 0.9542, -1.6357, 0.8697],
+  [1, -1.6683, 0.8852, -1.7674, 0.8735],
+  [1, -1.8585, 0.9653, -1.8498, 0.9516],
+  [1, -1.9299, 0.9621, -1.9354, 0.959],
+  [1, -1.98, 0.9888, -1.9867, 0.9923],
+];
+
+function biquadTick(s, x) {
+  const y = s.b0 * x + s.b1 * s.x1 + s.b2 * s.x2 - s.a1 * s.y1 - s.a2 * s.y2;
+  s.x2 = s.x1;
+  s.x1 = x;
+  s.y2 = s.y1;
+  s.y1 = y;
+  return y;
+}
+
+export function bow(sr, freq, dur, opt = {}) {
+  const f = Math.max(40, freq);
+  const pole = 0.75 - (0.2 * 22050 / sr);
+  const filterDelay = onePolePhaseDelay(pole, f, sr);
+  const roundTrip = Math.max(8, sr / f - filterDelay);
+  const beta = opt.position ?? 0.127236;
+  const seconds = Math.min(8, Math.max(0.25, dur + 0.6));
+  const n = Math.floor(sr * seconds);
+  const neck = new Line(roundTrip + 8);
+  const bridge = new Line(roundTrip + 8);
+  const loss = new OnePole(pole, 0.95);
+  const body = VIOLIN_BODY.map(([b0, b1, b2, a1, a2]) => ({ b0, b1, b2, a1, a2, x1: 0, x2: 0, y1: 0, y2: 0 }));
+  const slope = opt.slope ?? 3;
+  const offset = 0.001;
+  const maxVelocity = 0.03 + 0.2 * (opt.velocity ?? 1);
+  const out = new Float32Array(n);
+  const on = Math.floor(sr * Math.max(0.05, dur));
+  for (let i = 0; i < n; i += 1) {
+    const attack = Math.min(1, i / (sr * 0.02));
+    const release = i < on ? 1 : Math.max(0, 1 - (i - on) / (sr * 0.05));
+    const bowVelocity = maxVelocity * attack * release;
+    const bridgeReflection = -loss.tick(bridge.lastOut());
+    const nutReflection = -neck.lastOut();
+    const delta = bowVelocity - (bridgeReflection + nutReflection);
+    const reflected = bowVelocity > 0 ? delta * bowTable(delta, slope, offset) : 0;
+    neck.tick(bridgeReflection + reflected, roundTrip * (1 - beta));
+    bridge.tick(nutReflection + reflected, roundTrip * beta);
+    let y = bridge.lastOut();
+    for (let k = 0; k < body.length; k += 1) y = biquadTick(body[k], y);
+    out[i] = 0.1248 * y;
+  }
+  return finish(out, sr, 0.45);
+}
+
+function jet(x) {
+  const y = x * (x * x - 1);
+  return y > 1 ? 1 : y < -1 ? -1 : y;
+}
+
+/** Cook flue-pipe jet. boreRatio 2/3 overblows a flute; 1 speaks at the written pitch for an organ flue. */
+export function flute(sr, freq, dur, opt = {}) {
+  const fWritten = Math.max(60, freq);
+  const boreRatio = opt.boreRatio ?? 1;
+  const fBore = fWritten * boreRatio;
+  const jetRatio = opt.jetRatio ?? 0.32;
+  // A fixed reflection lowpass (cutoff near 2.6 kHz) lets a long pipe's upper modes outgrow
+  // the fundamental. Scale the cutoff with the pipe, the way radiation loss scales with a rank.
+  const pole = opt.cutoffRatio
+    ? Math.exp(-TAU * opt.cutoffRatio * fBore / sr)
+    : 0.7 - (0.1 * 22050 / sr);
+  // The jet travel sits in the same loop as the bore, so the sounding period is bore + jet.
+  const delay = Math.max(8, (sr / fBore - onePolePhaseDelay(pole, fBore, sr) - 1) / (1 + jetRatio));
+  const seconds = Math.min(8, Math.max(0.2, dur + 0.35));
+  const n = Math.floor(sr * seconds);
+  const bore = new Line(delay + 8);
+  const jetLine = new Line(delay + 8);
+  const reflect = new OnePole(pole, 1);
+  const out = new Float32Array(n);
+  const on = Math.floor(sr * Math.max(0.05, dur));
+  const noiseGain = opt.noise ?? 0.15;
+  const vibHz = opt.vib ?? 5.925;
+  const vibGain = opt.vibGain ?? 0.05;
+  const pressure = opt.pressure ?? 0.9;
+  const attack = opt.attack ?? 0.03;
+  let x1 = 0;
+  let y1 = 0;
+  for (let i = 0; i < n; i += 1) {
+    const t = i / sr;
+    const env = Math.min(1, t / attack) * (i < on ? 1 : Math.max(0, 1 - (i - on) / (sr * 0.06)));
+    let breath = pressure * env;
+    breath += breath * (noiseGain * (Math.random() * 2 - 1) + vibGain * Math.sin(TAU * vibHz * t));
+    const reflected = -reflect.tick(bore.lastOut());
+    const jetIn = jetLine.tick(breath - 0.5 * reflected, delay * jetRatio);
+    const afterJet = jet(jetIn);
+    const blocked = afterJet - x1 + 0.995 * y1;
+    x1 = afterJet;
+    y1 = blocked;
+    out[i] = 0.3 * bore.tick(blocked + 0.5 * reflected, delay);
+  }
+  return finish(out, sr, 0.45);
+}
+
+function resonator(sr, freq, dur, ratios, q, { amps, strike = true, chirp = 0, ring = 1.2, peak = 0.45 } = {}) {
+  const f0 = Math.max(20, freq);
+  const seconds = Math.min(6, Math.max(0.08, dur + ring));
+  const n = Math.floor(sr * seconds);
+  const qList = Array.isArray(q) ? q : null;
+  const modes = [];
+  for (let k = 0; k < ratios.length; k += 1) {
+    const fk = f0 * ratios[k];
+    if (fk >= sr * 0.45 || fk < 15) continue;
+    const qk = qList ? qList[k] ?? qList[qList.length - 1] : q;
+    const tau = qk / (Math.PI * fk);
+    modes.push({
+      freq: fk,
+      amp: amps ? amps[k] ?? 0 : 1 / (k + 1),
+      sigma: tau > 0 ? 1 / tau : 0,
+    });
+  }
+  return finish(modalSum(sr, n, modes, { strike, chirp }), sr, peak);
+}
+
+function cantilever(sr, freq, dur, q, ring) {
+  return resonator(sr, freq, dur, CANTILEVER, q, { ring, amps: CANTILEVER.map((_, k) => 1 / (k + 1) ** 2) });
 }
 
 const VOWELS = {
-  a: [800, 1150, 2900],
-  o: [450, 800, 2830],
-  u: [325, 700, 2530],
-  e: [400, 1600, 2700],
-  i: [270, 2140, 2950],
+  a: [730, 1090, 2440],
+  e: [530, 1840, 2480],
+  i: [270, 2290, 3010],
+  o: [570, 840, 2410],
+  u: [300, 870, 2240],
 };
+const FORMANT_BW = [60, 90, 150];
 
-/** Glottal pulse into parallel vowel formants. */
-export function choir(sr, freq, dur, vowel = "a") {
+/** Rosenberg (1971) glottal pulse, model B, into Peterson & Barney formants. */
+function choir(sr, freq, dur, vowel = "a") {
   const f = Math.max(70, freq);
   const seconds = Math.min(8, Math.max(0.2, dur + 0.35));
   const n = Math.floor(sr * seconds);
   const out = new Float32Array(n);
-  const formants = (VOWELS[vowel] || VOWELS.a).map((ff, k) => biquadBandpass(sr, ff, 8 - k * 2));
+  const centers = VOWELS[vowel] || VOWELS.a;
+  const formants = centers.map((ff, k) => biquadBandpass(sr, ff, ff / FORMANT_BW[k]));
   const gains = [1, 0.55, 0.22];
   const states = formants.map(() => ({ x1: 0, x2: 0, y1: 0, y2: 0 }));
-  const open = 0.42;
-  let phase = 0;
   const on = Math.floor(sr * dur);
+  let phase = 0;
   for (let i = 0; i < n; i += 1) {
-    const attack = Math.min(1, i / (sr * 0.06));
-    const release = i < on ? 1 : Math.max(0, 1 - (i - on) / (sr * 0.1));
+    const attack = Math.min(1, i / (sr * 0.04));
+    const release = i < on ? 1 : Math.max(0, 1 - (i - on) / (sr * 0.08));
     phase += f / sr;
     if (phase >= 1) phase -= 1;
-    const glottal = phase < open ? 0.5 * (1 - Math.cos(Math.PI * phase / open)) : 0;
+    let glottal = 0;
+    if (phase < 0.4) {
+      const x = phase / 0.4;
+      glottal = 3 * x * x - 2 * x * x * x;
+    } else if (phase < 0.56) {
+      const x = (phase - 0.4) / 0.16;
+      glottal = 1 - x * x;
+    }
     let y = 0;
-    formants.forEach((coeff, k) => {
+    for (let k = 0; k < formants.length; k += 1) {
+      const coeff = formants[k];
       const s = states[k];
       const v = coeff.b0 * glottal + coeff.b1 * s.x1 + coeff.b2 * s.x2 - coeff.a1 * s.y1 - coeff.a2 * s.y2;
       s.x2 = s.x1;
@@ -323,10 +372,10 @@ export function choir(sr, freq, dur, vowel = "a") {
       s.y2 = s.y1;
       s.y1 = v;
       y += v * gains[k];
-    });
+    }
     out[i] = y * attack * release;
   }
-  return finish(out, sr, null, 0.55);
+  return finish(out, sr, 0.45);
 }
 
 function tone(sr, freq, dur, partials) {
@@ -335,13 +384,16 @@ function tone(sr, freq, dur, partials) {
   const on = Math.floor(sr * dur);
   for (let i = 0; i < n; i += 1) {
     const t = i / sr;
-    const attack = Math.min(1, i / (sr * 0.03));
-    const release = i < on ? 1 : Math.max(0, 1 - (i - on) / (sr * 0.12));
+    const attack = Math.min(1, i / (sr * 0.02));
+    const release = i < on ? 1 : Math.max(0, 1 - (i - on) / (sr * 0.08));
     let y = 0;
-    for (const p of partials) y += p.amp * Math.sin(TAU * freq * p.ratio * t + (p.phase || 0));
+    for (let k = 0; k < partials.length; k += 1) {
+      const p = partials[k];
+      y += p.amp * Math.sin(TAU * freq * p.ratio * t);
+    }
     out[i] = y * attack * release;
   }
-  return finish(out, sr, null, 0.5);
+  return finish(out, sr, 0.4);
 }
 
 function cohFreq(freq, fx) {
@@ -360,21 +412,52 @@ function meow(sr) {
     const env = Math.sin(Math.min(Math.PI, (Math.PI * t) / 0.55)) ** 0.7;
     const f = 480 + 320 * Math.sin((Math.PI * t) / 0.55);
     phase += TAU * f / sr;
-    out[i] = Math.sin(phase) * env * (0.65 + 0.35 * Math.sin(TAU * 1300 * t));
+    out[i] = Math.sin(phase) * env;
   }
-  return finish(out, sr, null, 0.45);
+  return finish(out, sr, 0.4);
 }
 
 function burst(sr, dur, colorHz, q = 1.2) {
-  const n = Math.floor(sr * dur);
+  const n = Math.max(1, Math.floor(sr * dur));
   const out = new Float32Array(n);
   for (let i = 0; i < n; i += 1) out[i] = Math.random() * 2 - 1;
   applyBiquad(out, biquadBandpass(sr, colorHz, q));
   for (let i = 0; i < n; i += 1) out[i] *= Math.exp(-i / (sr * dur * 0.35));
-  return finish(out, sr, null, 0.5);
+  return finish(out, sr, 0.4);
 }
 
-export function renderVoice(sr, freq, dur, voice, fx = {}) {
+function snare(sr) {
+  const drum = resonator(sr, 190, 0.25, MEMBRANE, 18, { ring: 0.3, peak: 1 });
+  const wires = burst(sr, 0.22, 3500, 1.4);
+  const n = Math.min(drum.length, wires.length);
+  const out = new Float32Array(drum.length);
+  for (let i = 0; i < n; i += 1) out[i] = drum[i] + 0.45 * wires[i];
+  return finish(out, sr, 0.45);
+}
+
+const LOUDNESS = {
+  winds: 0.423, kick: 0.536, thump: 0.536, glass: 0.705, organ: 0.912,
+  theremin: 0.493, kalimba: 0.604, vibes: 0.569, pilot: 0.568, celesta: 0.605,
+  marimba: 0.694, bowl: 0.705, piano: 0.540, glassbell: 0.705, woodblock: 0.846,
+  choir: 0.576, epiano: 0.612, gong: 0.704, strings: 0.547, bowedmetal: 0.547,
+  tom: 1.519, reverse: 0.547, ksdrum: 1.769, noise: 1.159, bass: 0.647,
+  pizz: 0.695, pluck: 0.695, guitar: 0.630, snare: 1.316, cello: 0.547,
+  clave: 1.920, harp: 0.752, shaker: 1.663, tick: 1.861, hat: 1.130, "hat:open": 0.830,
+  "sample:cat": 0.495, "sample:static": 1.193, "sample:whoosh": 1.206, "sample:geiger": 1.956,
+};
+
+function level(wave, voice, fx) {
+  const key = voice === "sample"
+    ? `sample:${fx.sample || "static"}`
+    : voice === "hat" && fx.open ? "hat:open" : voice;
+  const trim = LOUDNESS[key] ?? 1;
+  if (trim === 1) return wave;
+  const out = new Float32Array(wave.length);
+  for (let i = 0; i < wave.length; i += 1) out[i] = wave[i] * trim;
+  return out;
+}
+
+function synthesize(sr, freq, dur, voice, fx = {}) {
   const d = Math.max(0.05, dur);
   const f = cohFreq(freq, fx);
   if (voice === "sample") {
@@ -386,65 +469,62 @@ export function renderVoice(sr, freq, dur, voice, fx = {}) {
   }
   switch (voice) {
     case "guitar":
-      return pluck(sr, f, d, { bright: 0.78, trip: 0.996, stiff: 0.18, pick: 0.22, body: "guitar", ring: 2.2 });
+      return stiffString(sr, f, d, STRINGS.guitar);
     case "harp":
-      return pluck(sr, f, d, { bright: 0.7, trip: 0.993, stiff: 0.08, pick: 0.12, body: "harp", ring: 1.8 });
+      return stiffString(sr, f, d, STRINGS.harp);
     case "pizz":
     case "pluck":
-      return pluck(sr, f, Math.min(d, 0.7), { bright: 0.84, trip: 0.988, stiff: 0.22, pick: 0.28, body: "cello", ring: 0.9 });
+      return stiffString(sr, f, Math.min(d, 0.7), STRINGS.pizz);
     case "bass":
-      return pluck(sr, f, d, { bright: 0.28, trip: 0.997, stiff: 0.45, pick: 0.15, body: "cello", ring: 1.2 });
-    case "kalimba":
-      return modal(sr, f, d, { modes: MODE_PRESETS.tine, q: [420, 90, 40], amps: [1, 0.22, 0.05], ring: 1.4 });
-    case "strings":
-      return bow(sr, f, d, { pressure: 0.62, position: 0.16, brightness: 0.48, body: "cello" });
-    case "cello":
-      return bow(sr, f, d, { pressure: 0.85, position: 0.12, velocity: 0.18, brightness: 0.32, body: "cello" });
-    case "bowedmetal":
-      return bow(sr, f, d, { pressure: 0.45, position: 0.22, velocity: 0.3, brightness: 0.8, body: "flute" });
-    case "winds":
-      return flute(sr, f, d, { breath: 0.7, vib: 5.2 });
-    case "organ":
-      return flute(sr, f, d, { breath: 0.5, vib: 0.2 });
-    case "theremin":
-      return tone(sr, f, d, [{ ratio: 1, amp: 0.9 }, { ratio: 2, amp: 0.08 }, { ratio: 1.003, amp: 0.25, phase: 0.4 }]);
-    case "pilot":
-      return tone(sr, f, d, [{ ratio: 1, amp: 0.85 }, { ratio: 0.5, amp: 0.2 }]);
-    case "glass":
-      return modal(sr, f, d, { modes: [1, 1.004, 2.01, 3], q: [900, 900, 400, 200], amps: [1, 0.8, 0.15, 0.05], ring: 2 });
+      return stiffString(sr, f, d, STRINGS.bass);
     case "piano":
+      return stiffString(sr, f, d, STRINGS.piano);
     case "epiano":
-      return piano(sr, f, d);
-    case "vibes":
-      return modal(sr, f, d, { modes: MODE_PRESETS.bar, q: [700, 320, 160, 90], amps: [1, 0.22, 0.07, 0.03], ring: 2.6 });
-    case "marimba":
-    case "celesta":
-      return modal(sr, f, d, { modes: MODE_PRESETS.bar, q: voice === "celesta" ? [500, 180, 70, 40] : [220, 40, 18, 10], amps: [1, 0.35, 0.08, 0.02], ring: voice === "celesta" ? 1.8 : 0.7 });
-    case "glassbell":
-      return modal(sr, f, d, { modes: MODE_PRESETS.glass, q: 640, ring: 3 });
-    case "gong":
-      return modal(sr, f, d, { modes: MODE_PRESETS.metal, q: 500, ring: 3.5 });
-    case "bowl":
-      return modal(sr, f, d, { modes: MODE_PRESETS.bowl, q: [1100, 800, 600, 400, 280], ring: 4 });
+      return cantilever(sr, f, d, 280, 1.2);
+    case "kalimba":
+      return cantilever(sr, f, d, 350, 1.4);
+    case "strings":
+    case "cello":
+    case "bowedmetal":
+      return bow(sr, f, d, { position: 0.127236, slope: 3, velocity: 1 });
+    case "winds":
+      return flute(sr, f, d, { noise: 0.15, vib: 5.925, vibGain: 0.05, pressure: 0.85, attack: 0.04 });
     case "choir":
       return choir(sr, f, d, fx.vowel || "a");
+    case "organ":
+      return flute(sr, f, d, { noise: 0.05, vib: 1.2, vibGain: 0.008, pressure: 0.75, attack: 0.025, jetRatio: 0.32, cutoffRatio: 3.5 });
+    case "theremin":
+      return tone(sr, f, d, [{ ratio: 1, amp: 1 }]);
+    case "pilot":
+      return tone(sr, f, d, [{ ratio: 1, amp: 0.85 }, { ratio: 0.5, amp: 0.2 }]);
     case "reverse": {
-      const bowed = bow(sr, f, Math.max(0.4, d), { pressure: 0.7, brightness: 0.5 });
-      bowed.reverse();
-      return bowed;
+      const waved = bow(sr, f, Math.max(0.4, d), { position: 0.127236, slope: 3, velocity: 1 });
+      waved.reverse();
+      return waved;
     }
+    case "vibes":
+      return resonator(sr, f, d, TUNED_BAR, 500, { ring: 2.6, amps: [1, 0.22] });
+    case "marimba":
+      return resonator(sr, f, d, TUNED_BAR, 70, { ring: 0.7, amps: [1, 0.18] });
+    case "celesta":
+      return resonator(sr, f, d, TUNED_BAR, 180, { ring: 1.6, amps: [1, 0.2] });
+    case "glass":
+    case "glassbell":
+    case "gong":
+    case "bowl":
+      return resonator(sr, f, d, BELL, voice === "gong" ? 400 : voice === "bowl" ? 700 : 500, { ring: voice === "bowl" ? 3.2 : 2.4 });
     case "kick":
     case "thump":
-      return modal(sr, 52, 0.4, { modes: [1, 1.6, 2.2], q: [16, 10, 7], amps: [1, 0.3, 0.1], ring: 0.35, pitchDrop: 1.1, peak: 0.75 });
+      return resonator(sr, 52, 0.4, MEMBRANE, 14, { ring: 0.35, chirp: 0.8, amps: [1, 0.35, 0.15, 0.08, 0.05, 0.03], peak: 0.55 });
     case "snare":
-      return modal(sr, 190, 0.25, { modes: MODE_PRESETS.membrane, q: 18, ring: 0.3 });
+      return snare(sr);
     case "tom":
-      return modal(sr, f, 0.45, { modes: MODE_PRESETS.membrane, q: 28, ring: 0.55, pitchDrop: 0.2 });
+      return resonator(sr, f, 0.45, MEMBRANE, 22, { ring: 0.5, chirp: 0.15 });
     case "hat":
-      return modal(sr, fx.open ? 2600 : 3400, fx.open ? 0.32 : 0.08, { modes: MODE_PRESETS.metal, q: fx.open ? 90 : 40, ring: fx.open ? 0.45 : 0.1, peak: 0.4 });
+      return resonator(sr, fx.open ? 2600 : 3400, fx.open ? 0.32 : 0.08, BELL, fx.open ? 650 : 270, { ring: fx.open ? 0.45 : 0.12, peak: 0.4 });
     case "clave":
     case "woodblock":
-      return modal(sr, voice === "clave" ? 2100 : f, 0.2, { modes: MODE_PRESETS.wood, q: [70, 30, 16], ring: 0.25 });
+      return resonator(sr, voice === "clave" ? 2100 : f, 0.2, BAR, 40, { ring: 0.2, amps: [1, 0.3, 0.08, 0.03] });
     case "tick":
       return burst(sr, 0.02, 4200, 2.4);
     case "shaker":
@@ -452,8 +532,24 @@ export function renderVoice(sr, freq, dur, voice, fx = {}) {
     case "noise":
       return burst(sr, Math.min(2, d + 0.2), Math.max(200, f), 0.8);
     case "ksdrum":
-      return modal(sr, f, 0.4, { modes: MODE_PRESETS.membrane, q: 20, ring: 0.5, pitchDrop: 0.4 });
+      return resonator(sr, f, 0.4, MEMBRANE, 16, { ring: 0.45, chirp: 0.35 });
     default:
       return null;
   }
+}
+
+export function renderVoice(sr, freq, dur, voice, fx = {}) {
+  const wave = synthesize(sr, freq, dur, voice, fx);
+  return wave && level(wave, voice, fx);
+}
+
+export function modal(sr, freq, dur, opt = {}) {
+  const ratios = opt.modes || BAR;
+  const q = opt.q ?? 200;
+  return resonator(sr, freq, dur, ratios, q, {
+    ring: opt.ring ?? 1.2,
+    amps: opt.amps,
+    chirp: opt.pitchDrop || 0,
+    peak: opt.peak ?? 0.45,
+  });
 }

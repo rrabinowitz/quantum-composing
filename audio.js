@@ -24,12 +24,38 @@ export async function loadSamples() {}
 const isNative = typeof window !== "undefined" && !!window.webkit?.messageHandlers?.saveBlob;
 const isSafari = !isNative && /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|Edg/.test(navigator.userAgent);
 let ctx, master, meter, nativeAudio, streamAudio;
+// Jot feedback delay network. Low-frequency T60 is 1.7 s; the one-pole in each loop shortens the highs.
 function impulse(c, sec) {
-  const len = Math.floor(c.sampleRate * sec), b = c.createBuffer(2, len, c.sampleRate);
-  for (let ch = 0; ch < 2; ch++) {
-    const d = b.getChannelData(ch);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+  const sr = c.sampleRate;
+  const len = Math.floor(sr * sec);
+  const b = c.createBuffer(2, len, sr);
+  const L = b.getChannelData(0);
+  const R = b.getChannelData(1);
+  const seconds = [0.031, 0.037, 0.043, 0.053];
+  const lines = seconds.map((s) => {
+    const n = Math.max(2, Math.round(s * sr));
+    return { buf: new Float32Array(n), w: 0, n, lp: 0, g: 10 ** (-3 * n / (sr * 1.7)) };
+  });
+  const damp = 0.35;
+  let peak = 1e-8;
+  for (let i = 0; i < len; i += 1) {
+    const x = i === 0 ? 1 : 0;
+    const y = lines.map((line) => line.buf[line.w]);
+    const sum = y[0] + y[1] + y[2] + y[3];
+    for (let k = 0; k < 4; k += 1) {
+      const fb = y[k] - 0.5 * sum + (k === 0 ? x : 0);
+      const line = lines[k];
+      line.lp += (1 - damp) * (fb - line.lp);
+      line.buf[line.w] = line.g * line.lp;
+      line.w += 1;
+      if (line.w >= line.n) line.w = 0;
+    }
+    L[i] = y[0] + y[2];
+    R[i] = y[1] + y[3];
+    peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i]));
   }
+  const g = 0.8 / peak;
+  for (let i = 0; i < len; i += 1) { L[i] *= g; R[i] *= g; }
   return b;
 }
 // Master chain (gain → compressor + reverb) for any context, live or offline.
@@ -57,7 +83,7 @@ export function ac() {
       try { navigator.audioSession.type = "playback"; } catch (e) { console.warn("Audio session unavailable", e); }
     }
     const LiveContext = window.AudioContext || window.webkitAudioContext;
-    ctx = new LiveContext(); master = makeOutput(ctx); prepare(ctx);
+    ctx = new LiveContext(); master = makeOutput(ctx); ensureStations(); prepare(ctx);
     ctx.onstatechange = () => { if (ctx.state === "running") document.getElementById("audioUnlock")?.remove(); };
   }
   return ctx;
@@ -133,7 +159,62 @@ if (isSafari) {
   });
 }
 export const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
-export function createBus() { const c = ac(), g = c.createGain(); g.connect(master); return g; }
+
+const STATIONS = ["spectra", "pair", "histories", "orbits", "register"];
+const stationGain = new Map();
+const stationLevel = new Map(STATIONS.map((id) => [id, 0.8]));
+let activeStation = "spectra";
+
+function ensureStations() {
+  if (stationGain.size || !ctx || !master) return;
+  for (const id of STATIONS) {
+    const gain = ctx.createGain();
+    gain.gain.value = stationLevel.get(id) ?? 0.8;
+    gain.connect(master);
+    stationGain.set(id, gain);
+  }
+}
+
+function stationInput() {
+  ac();
+  return stationGain.get(activeStation) || master;
+}
+
+export function setActiveStation(id) {
+  if (STATIONS.includes(id)) activeStation = id;
+}
+
+export function activeStationGain() {
+  return stationLevel.get(activeStation) ?? 0.8;
+}
+
+export function bindStationVolumes(root = document) {
+  root.querySelectorAll("input[data-station]").forEach((input) => {
+    const id = input.dataset.station;
+    const out = input.parentElement?.querySelector("output");
+    const apply = () => {
+      const unit = Math.max(0, Math.min(1, Number(input.value) / 100));
+      stationLevel.set(id, unit);
+      if (out) out.textContent = input.value;
+      const node = stationGain.get(id);
+      if (!node) return;
+      const now = node.context.currentTime;
+      node.gain.cancelScheduledValues(now);
+      node.gain.setValueAtTime(node.gain.value, now);
+      node.gain.linearRampToValueAtTime(unit, now + 0.03);
+    };
+    input.addEventListener("input", apply);
+    if (out) out.textContent = input.value;
+    stationLevel.set(id, Math.max(0, Math.min(1, Number(input.value) / 100)));
+  });
+}
+
+export function createBus() {
+  const c = ac();
+  const gain = c.createGain();
+  gain.connect(stationInput());
+  return gain;
+}
 
 function osc(c, type, f, t, end, dest, gain = 1) {
   const o = c.createOscillator(), g = c.createGain();
@@ -168,7 +249,8 @@ const SUSTAINED = new Set(["strings", "cello", "winds", "choir", "organ", "there
    fx: { pan, detune (cents), smear (0..1 — starts as a pitch cluster that collapses onto the note),
          glide (midi to slide from), vib: "shared" | rate(Hz) } */
 export function note(midi, t, dur, voice = "piano", vel = 0.15, dest, fx = {}) {
-  const c = dest ? dest.context : ac(); dest = dest || master;
+  const c = dest ? dest.context : ac();
+  dest = dest || stationInput();
   fx = fx || {};
   let out = dest;
   if (fx.pan && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, fx.pan)); p.connect(dest); out = p; }
@@ -331,7 +413,7 @@ export function pad(midi, dest, voice = "glass") {
   g.connect(dest);
   const struck = ["guitar", "pizz", "harp", "marimba", "epiano", "reverse", "glass", "vibes", "glassbell", "kalimba", "celesta", "bowl", "piano", "gong"].includes(voice);
   if (struck) {
-    const strike = () => note(midi, c.currentTime + 0.05, 1.6, voice, 0.28, g);
+    const strike = () => note(midi, c.currentTime + 0.05, 1.6, voice, 0.16, g);
     strike();
     const timer = setInterval(strike, 2100);
     return () => { clearInterval(timer); g.gain.setTargetAtTime(0, c.currentTime, 0.05); setTimeout(() => g.disconnect(), 700); };

@@ -48,6 +48,7 @@
           <button id="specSound" class="go">▶ Let it ring</button>
           <button id="specMeasure">Look</button>
           <button id="specPrep">Prepare again</button>
+          <label class="lbl vol">volume <input data-station="spectra" type="range" min="0" max="100" value="80" aria-label="Spectra volume"><output>80</output></label>
         </div>
         <div class="row"><button id="specMidi" class="mini">⤓ MIDI</button><button id="specWav" class="mini">⤓ WAV</button></div>
         <p id="specStatus" class="status">Drag a phasor. Tap a harmonic of D to measure.</p>
@@ -73,6 +74,7 @@
       <button id="teleport" title="Send A's tune to B; A's original is destroyed (no-cloning)">Teleport A → B</button>
       <span class="sep"></span>
       <button id="pairMidi" class="mini">⤓ MIDI</button><button id="pairWav" class="mini">⤓ WAV</button>
+      <label class="lbl vol">volume <input data-station="pair" type="range" min="0" max="100" value="80" aria-label="Pair volume"><output>80</output></label>
     </div>
     <div id="rules" class="rules"></div>
     <p id="pairLog" class="status center">Tap inside an orbit to place or remove a note.</p>
@@ -86,6 +88,7 @@
       <label class="lbl">♩ <input id="bpm" type="range" min="50" max="160" value="84"><span id="bpmV">84</span></label>
       <span class="sep"></span>
       <button id="histMidi" class="mini">⤓ MIDI</button><button id="histWav" class="mini">⤓ WAV</button>
+      <label class="lbl vol">volume <input data-station="histories" type="range" min="0" max="100" value="80" aria-label="Histories volume"><output>80</output></label>
     </div>
     <div class="row lbls">
       <label title="Each section's tempo is measured too"><input type="checkbox" id="mTempo"> measure tempo</label>
@@ -109,6 +112,7 @@
           <button id="orbPlay" class="go">▶ Spin</button>
           <button id="orbOpen">Open the box</button>
           <button id="orbMidi" class="mini">⤓ MIDI</button><button id="orbWav" class="mini">⤓ WAV</button>
+          <label class="lbl vol">volume <input data-station="orbits" type="range" min="0" max="100" value="80" aria-label="Orbits volume"><output>80</output></label>
         </div>
         <p id="orbStatus" class="status"></p>
       </div>
@@ -128,6 +132,7 @@
       <button id="regAdd" class="mini">+ qubit</button><button id="regRem" class="mini">− qubit</button><button id="regClear" class="mini">clear</button>
       <span class="sep"></span>
       <button id="regMidi" class="mini">⤓ MIDI</button><button id="regWav" class="mini">⤓ WAV</button>
+      <label class="lbl vol">volume <input data-station="register" type="range" min="0" max="100" value="80" aria-label="Register volume"><output>80</output></label>
     </div>
     <p id="regStatus" class="status"></p>
   </section>

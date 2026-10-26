@@ -174,7 +174,7 @@ function syncProbeLoop() {
   const want = sound && S.links.pairToSpec;
   if (want && !probeLoop) probeLoop = runLoop(() => 30 / S.bpm, (i, t, bus) => {
     const s = i % 16, d = S.A[s];
-    if (d != null) note(degMidi(d) + 12, t, 15 / S.bpm, "strings", 0.11, bus);
+    if (d != null) note(degMidi(d) + 12, t, 15 / S.bpm, "strings", 0.16, bus);
     if (s % 8 === 0) { const f = S.A.slice(s, s + 8).find((x) => x != null); if (f != null) at(t, () => { if (won != null && S.q.mode !== "zeno") prepare(); collapse(degMidi(f), "Particle A"); }); }
   });
   else if (!want && probeLoop) { probeLoop(); probeLoop = null; }

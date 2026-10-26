@@ -84,7 +84,7 @@ function edit(w, e) {
   const s = Math.round((((Math.atan2(y, x) + Math.PI / 2 + 2 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI)) * 16) % 16;
   const d = Math.max(DEG_MIN, Math.min(DEG_MAX, DEG_MIN + Math.floor(((r - g.r0) / (g.R - g.r0)) * LV)));
   S[w][s] = S[w][s] === d ? null : d;
-  if (S[w][s] != null) note(degMidi(d) + (w === "A" ? 12 : 0), ac().currentTime + 0.01, 0.3, w === "A" ? pal().mel : pal().ctr, 0.14);
+  if (S[w][s] != null) note(degMidi(d) + (w === "A" ? 12 : 0), ac().currentTime + 0.01, 0.3, w === "A" ? pal().mel : pal().ctr, 0.16);
   paint(); refresh();
 }
 function orbit(w, tune, ghost) {

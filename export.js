@@ -1,4 +1,4 @@
-import { makeOutput, note, prepare } from "./audio.js";
+import { activeStationGain, makeOutput, note, prepare, setActiveStation } from "./audio.js";
 
 const PROG = {
   piano: [0, 0, "Piano"], bass: [1, 32, "Bass"], strings: [2, 48, "Strings"], winds: [3, 71, "Woodwinds"],
@@ -59,7 +59,7 @@ export async function toWav(notes, total) {
   const buf = await c.startRendering();
   const L = buf.getChannelData(0), R = buf.getChannelData(1), len = L.length;
   let peak = 0; for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i]));
-  const g = peak > 0 ? 0.95 / peak : 1;
+  const g = (peak > 0 ? 0.95 / peak : 1) * activeStationGain();
   const ab = new ArrayBuffer(44 + len * 4), v = new DataView(ab);
   const w = (o, s) => [...s].forEach((ch, i) => v.setUint8(o + i, ch.charCodeAt(0)));
   w(0, "RIFF"); v.setUint32(4, 36 + len * 4, true); w(8, "WAVE"); w(12, "fmt ");
@@ -97,8 +97,11 @@ export function download(blob, name) {
 
 // Wire a pair of export buttons to a builder returning {notes, total, bpm}
 export function wireExport(midiBtn, wavBtn, build, base) {
-  midiBtn.onclick = () => { const r = build(); download(toMidi(r.notes, r.bpm), base + ".mid"); };
+  const station = midiBtn.closest("section")?.id;
+  const arm = () => { if (station) setActiveStation(station); };
+  midiBtn.onclick = () => { arm(); const r = build(); download(toMidi(r.notes, r.bpm), base + ".mid"); };
   wavBtn.onclick = async () => {
+    arm();
     const r = build(), label = wavBtn.textContent;
     wavBtn.disabled = true; wavBtn.textContent = "Rendering…";
     try { download(await toWav(r.notes, r.total), base + ".wav"); }

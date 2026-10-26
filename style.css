@@ -33,6 +33,9 @@ input[type=range]{accent-color:var(--ink)}
 .lbl,.lbls label{display:flex;gap:6px;align-items:center;color:var(--dim);font-size:14px}
 .lbls{gap:18px}
 .lbl input[type=range]{width:100px}
+.lbl.vol{margin-left:auto}
+.lbl.vol input[type=range]{width:120px}
+.lbl.vol output{min-width:2.2ch;font-variant-numeric:tabular-nums}
 .status{color:var(--dim);min-height:22px;font-size:14px}
 .status b,.log b{color:var(--ink)}
 .center{text-align:center}

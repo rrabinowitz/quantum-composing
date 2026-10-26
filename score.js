@@ -73,7 +73,7 @@ export function composer(bar0, src = S.hsrc, totalBars = 16) {
     const melV = cold ? "harp" : P.mel, cpV = cold ? "harp" : P.cp, notes = [];
     const cantus = new Array(8).fill(null);
     for (let k = 0; k < W; k++) {
-      const reg = [0, 12, -12, 24][k], vel = 0.12 / Math.sqrt(W), world = W > 1 ? k : undefined;
+      const reg = [0, 12, -12, 24][k], vel = 0.16 / Math.sqrt(W), world = W > 1 ? k : undefined;
       if (A8) vary(A8, melH.tones, T, stick).forEach((d, s) => {
         if (d == null) return; const m = degMidi(d) + 12 + reg; if (!k) cantus[s] = m;
         notes.push({ midi: m, t: t0 + s * e8, dur: e8 * 0.92, voice: melV, vel, role: "mel", world, fx: fx({ vowel: VOW[k], pan: W > 1 ? -0.8 + (1.6 * k) / (W - 1) : 0 }) });
@@ -193,7 +193,7 @@ export function pairBranches(A, B, bell) {
 }
 export function pairNotes(branches, t0, e8, hs) {
   const out = [];
-  branches.forEach(([A, B]) => { for (let s = 0; s < 16; s++) { const t = t0 + s * e8, v = 0.12 / Math.sqrt(branches.length);
+  branches.forEach(([A, B]) => { for (let s = 0; s < 16; s++) { const t = t0 + s * e8, v = 0.16 / Math.sqrt(branches.length);
     if (A[s] != null) out.push({ midi: degMidi(A[s]) + 12, t, dur: e8 * 0.92, voice: pal().mel, vel: v, role: "theme", line: "A" });
     if (B[s] != null) out.push({ midi: degMidi(B[s]), t, dur: e8 * 0.92, voice: pal().ctr, vel: v, role: "theme", line: "B" }); } });
   if (hs) for (let k = 0; k < 2; k++) bed(hs(), t0 + k * 8 * e8, 8 * e8 * 0.95, out);

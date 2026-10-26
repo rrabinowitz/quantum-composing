@@ -68,13 +68,13 @@ function step(sim, r) {
   return ev;
 }
 function rowNotes(sim, t, e8, ev, out) {
-  sim.probs().forEach((w, k) => { if (w >= 0.01) out.push({ midi: pitchOf(k), t, dur: e8 * 1.8, voice: R.inst, vel: 0.11 * Math.sqrt(w), fx: { pan: Math.sin(sim.phase(k)) * 0.8 } }); });
+  sim.probs().forEach((w, k) => { if (w >= 0.01) out.push({ midi: pitchOf(k), t, dur: e8 * 1.8, voice: R.inst, vel: 0.16 * Math.sqrt(w), fx: { pan: Math.sin(sim.phase(k)) * 0.8 } }); });
   ev.forEach((e) => out.push({ midi: e.grw ? 36 : 100, t, dur: e.grw ? 0.3 : 0.01, voice: e.grw ? "thump" : "tick", vel: 0.05, fx: {} }));
 }
 function readout(sim, t, e8, out) {
   if (S.q.mode === "mwi") return null;
   const k = sim.readout();
-  out.push({ midi: pitchOf(k) + 12, t, dur: e8 * 4, voice: "bowl", vel: 0.12, fx: {} }, { midi: 100, t, dur: 0.01, voice: "tick", vel: 0.06, fx: {} });
+  out.push({ midi: pitchOf(k) + 12, t, dur: e8 * 4, voice: "bowl", vel: 0.16, fx: {} }, { midi: 100, t, dur: 0.01, voice: "tick", vel: 0.06, fx: {} });
   return k;
 }
 export function buildRegister(loops = 2) {
@@ -124,7 +124,7 @@ function preview(sound = false) {
   snap = sim; paint();
   const top = sim.probs().map((w, k) => ({ w, k })).filter((x) => x.w > 0.01).sort((a, b) => b.w - a.w).slice(0, 4);
   say("Final state: " + top.map((x) => `${ket(x.k)} ${Math.round(x.w * 100)}%`).join(" · ") + (S.q.mode === "mwi" ? " — never read out under Many-Worlds; every branch keeps sounding." : ""));
-  if (sound && top.length) note(pitchOf(top[0].k), ac().currentTime + 0.01, 0.35, R.inst, 0.18);
+  if (sound && top.length) note(pitchOf(top[0].k), ac().currentTime + 0.01, 0.35, R.inst, 0.16);
 }
 export function paint() {
   const g = geo(); if (!g.W) return;

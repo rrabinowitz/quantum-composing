@@ -52,6 +52,29 @@ test("effects that used to require missing samples still render", () => {
   assert.ok(open.length > closed.length);
 });
 
+function windowRms(samples, sr) {
+  const n = Math.max(1, Math.min(samples.length, Math.floor(sr * 0.05)));
+  let acc = 0;
+  for (let i = 0; i < Math.min(n, samples.length); i += 1) acc += samples[i] * samples[i];
+  let best = acc;
+  for (let i = n; i < samples.length; i += 1) {
+    acc += samples[i] * samples[i] - samples[i - n] * samples[i - n];
+    if (acc > best) best = acc;
+  }
+  return Math.sqrt(best / n);
+}
+
+test("voices share a loudness level", () => {
+  const sr = 48000;
+  const freq = 293.66;
+  const guitar = windowRms(renderVoice(sr, freq, 0.6, "guitar"), sr);
+  const winds = windowRms(renderVoice(sr, freq, 0.6, "winds"), sr);
+  const hat = windowRms(renderVoice(sr, freq, 0.6, "hat"), sr);
+  assert.ok(guitar > 0.12 && winds > 0.12 && hat > 0.1);
+  assert.ok(Math.max(guitar, winds) / Math.min(guitar, winds) < 1.25);
+  assert.ok(Math.max(guitar, hat) / Math.min(guitar, hat) < 1.6);
+});
+
 test("every ensemble voice renders", () => {
   for (const voice of ["vibes", "pizz", "cello", "guitar", "choir", "gong", "reverse", "piano"]) {
     const wave = renderVoice(44100, 311, 0.25, voice);
