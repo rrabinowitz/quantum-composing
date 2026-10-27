@@ -30,6 +30,7 @@ const PAGES = {
       "IV Orbits is a set of rings. Spin plays them. Open the box reads the state.",
       "V Register is a small computer. Time runs downward; each column is a qubit. Run sounds the state: each basis state is a pitch, loudness is its probability, and stereo position is its phase. readout is the last hit of each pass. second pass plays the circuit again on another instrument.",
       "Orchestration sits under the title. tune, inner, and bass are how loud each part sits. tune double, inner double, and bass double add a second instrument at the unison or the octave. long notes either restrikes a tone the instrument cannot hold, or hands it to a voice that can. rescore keeps the pitches and puts another ensemble on them, or assigns each part by hand. chairs can admit the bass and chord first, then the inner parts, then the tune, then the drums.",
+      "Physics sits under that. forks is Sum or One. Sum sounds every length of a section together: bars they share get louder, bars only some of them reach can cancel, and the measured length cuts the rest. A short note spreads across the neighboring ratios; a long one sits on one. While a passage is hot, each note keeps a quiet halo of the ratios it almost chose. A tone inside the current spectrum becomes accompaniment. The part of it that sits outside stays the tune and beats against the chord. Dragging a phasor on Spectra adds shared tones as amplitudes, so the tone swells, thins, or beats. commutator is Off, Excite then Mirror, H then Z, Fifth, Third, or Quality. Fifth, Third, and Quality play only the lattice chords that move under that step.",
     ],
   },
   sound: {
@@ -72,6 +73,12 @@ export function initHelp() {
     select.addEventListener("change", () => renderTheory(select.value));
     renderTheory(select.value);
   }
+  document.querySelectorAll(".info-panel .sheet-x").forEach((button) => {
+    button.addEventListener("click", () => {
+      const menu = button.closest("details");
+      if (menu) menu.open = false;
+    });
+  });
   document.addEventListener("keydown", (event) => {
     const tag = event.target && event.target.tagName;
     const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (event.target && event.target.isContentEditable);

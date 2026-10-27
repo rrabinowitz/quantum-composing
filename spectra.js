@@ -4,6 +4,7 @@ import { S, $, on, emit, pal, SPECTRUM_NAMES, SPECTRA, voicing, contains, harmMi
 import { odds, born, draw, look, rand, pass, toC, fromC } from "./ket.js";
 import { ac, note, pad, createBus, runLoop, at, noiseSrc } from "./audio.js";
 import { collapseSound, buildSpectra } from "./score.js";
+import { groupPitches, phasorSum, latticeResidue, latticeStep } from "./physics.js";
 import { wireExport } from "./export.js";
 
 export const HUE = ["#c2452d", "#2d5fc2", "#1f8a5b", "#b8860b", "#7b3fa0", "#3b8ea5", "#d0657f", "#6b5d3f"];
@@ -20,9 +21,9 @@ export function initSpectra() {
   wireExport($("specMidi"), $("specWav"), () => buildSpectra(8), "spectra");
   const c = $("specCv");
   c.addEventListener("pointerdown", down); c.addEventListener("pointermove", move);
-  addEventListener("pointerup", () => { if (drag >= 0) audition(S.spec[drag]); drag = -1; });
+  addEventListener("pointerup", () => { if (drag >= 0) { audition(S.spec[drag]); if (sound && sound.lattice) rebuild(); drag = -1; } });
   addEventListener("pointercancel", () => (drag = -1));
-  on("q", () => { prepare(); chips(); if (ringMode !== S.q.mode) { ringMode = S.q.mode; if (S.ensemble === "auto") rebuild(); } }); on("ens", rebuild); on("spec", () => { prepare(); chips(); rebuild(); }); on("links", syncProbeLoop);
+  on("q", () => { prepare(); chips(); if (ringMode !== S.q.mode) { ringMode = S.q.mode; if (S.ensemble === "auto") rebuild(); } }); on("ens", rebuild); on("spec", () => { prepare(); chips(); rebuild(); }); on("links", syncProbeLoop); on("orch", rebuild);
   requestAnimationFrame(frame);
 }
 const say = (h) => ($("specStatus").innerHTML = h);
@@ -108,14 +109,17 @@ function frame() {
   }
   if (restoreAt && now > restoreAt) { prepare(); say("GRW: the state has spread back into superposition."); }
   const shim = (s) => (won == null ? 1 + 0.6 * c * Math.cos(2 * Math.PI * 0.5 * t + (s.phase * Math.PI) / 180) : 1);
-  if (sound) {
+  if (sound && !sound.lattice) {
     const ct = ac().currentTime;
     aim(sound.env.gain, mode === "decoherence" && won == null ? (1 - c) * 0.05 : 0, ct, 0.2);
-    S.spec.forEach((s, i) => {
-      const lvl = won == null ? Math.sqrt(p[i]) * shim(s) : won === i ? 1.3 : 0;
-      const L = sound.layers[i]; if (!L) return;
-      aim(L.g.gain, lvl * 0.05, ct, 0.04);
-      if (L.p.pan) aim(L.p.pan, won === i ? 0 : Math.max(-1, Math.min(1, Math.cos((s.phase * Math.PI) / 180) * 0.7 * (won == null ? c : 1))), ct, 0.15);
+    sound.layers.forEach((L) => {
+      const sum = phasorSum(L.members.map((i) => ({
+        mag: won == null ? Math.sqrt(p[i] || 0) : won === i ? 1.3 : 0,
+        phase: S.spec[i] ? S.spec[i].phase : 0,
+      })));
+      aim(L.g.gain, sum.mag * 0.05, ct, 0.05);
+      if (L.depth) L.depth.gain.setTargetAtTime(sum.beatDepth, ct, 0.08);
+      if (L.lfo) L.lfo.frequency.setTargetAtTime(Math.max(0.2, sum.beatHz || 0.2), ct, 0.08);
     });
   }
   // chips
@@ -151,9 +155,23 @@ function frame() {
 function start() {
   beginPerformance("spectra", silence);
   const bus = createBus(), c = ac();
-  sound = { bus, layers: S.spec.map((s) => {
-    const g = c.createGain(), p = c.createStereoPanner ? c.createStereoPanner() : c.createGain(); g.gain.value = 0; g.connect(p); p.connect(bus);
-    return { g, p, stops: voicing(s.name).map((m, k) => pad(k ? m : m + 12, g, pal().chord)) };
+  const alt = latticeStep(S.phys.commutator) ? latticeResidue(S.spec, S.phys.commutator) : [];
+  const source = alt.length ? alt : null;
+  const items = [];
+  (source || S.spec).forEach((s, index) => voicing(s.name).forEach((midi) => items.push({ midi, index, mag: s.mag, phase: s.phase || 0 })));
+  sound = { bus, lattice: !!source, layers: groupPitches(items, 0.08).map((group) => {
+    const g = c.createGain(); g.gain.value = 0;
+    const mod = c.createGain(); mod.gain.value = 1; g.connect(mod);
+    const lfo = c.createOscillator(); const depth = c.createGain(); depth.gain.value = 0;
+    lfo.frequency.value = 2; lfo.connect(depth); depth.connect(mod.gain); lfo.start();
+    if (source) {
+      const sum = phasorSum(group.members.map((i) => ({ mag: source[i].mag, phase: source[i].phase })));
+      g.gain.value = sum.mag * 0.05;
+      depth.gain.value = sum.beatDepth;
+      lfo.frequency.value = Math.max(0.2, sum.beatHz || 0.2);
+    }
+    mod.connect(bus);
+    return { g, lfo, depth, members: group.members, stops: [pad(group.midi, g, pal().chord)], stopLfo: () => { try { lfo.stop(); } catch { /* already stopped */ } } };
   }) };
   const bp = c.createBiquadFilter(), eg = c.createGain(); bp.type = "bandpass"; bp.frequency.value = 1200; bp.Q.value = 0.6; eg.gain.value = 0;
   const ns = noiseSrc(c, c.currentTime, 0, bp); bp.connect(eg); eg.connect(bus);
@@ -164,7 +182,7 @@ function silence() {
   endPerformance("spectra");
   if (!sound) return; const s = sound; sound = null;
   s.bus.gain.setTargetAtTime(0, ac().currentTime, 0.15);
-  setTimeout(() => { s.layers.forEach((l) => l.stops.forEach((f) => f())); s.envStop(); s.bus.disconnect(); }, 900);
+  setTimeout(() => { s.layers.forEach((l) => { l.stops.forEach((f) => f()); if (l.stopLfo) l.stopLfo(); }); s.envStop(); s.bus.disconnect(); }, 900);
   $("specSound").textContent = "▶ Let it ring"; syncProbeLoop();
 }
 function rebuild() { if (sound) { const k = won; silence(); start(); won = k; } }

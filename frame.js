@@ -12,10 +12,19 @@ export function initFrame() {
   $("ens").innerHTML = Object.entries(ENSEMBLES).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join("");
   $("ens").onchange = (e) => { S.ensemble = e.target.value; params(); emit("ens"); };
   $("linksBtn").onclick = () => { $("links").hidden = !$("links").hidden; $("linksBtn").classList.toggle("on", !$("links").hidden); };
-  $("links").innerHTML = Object.entries(LINKS).map(([k, [l]]) => `<label><input type="checkbox" data-k="${k}" ${S.links[k] ? "checked" : ""}> ${l}</label>`).join("");
+  $("links").innerHTML = `<button type="button" class="sheet-x" aria-label="Close">×</button>` + Object.entries(LINKS).map(([k, [l]]) => `<label><input type="checkbox" data-k="${k}" ${S.links[k] ? "checked" : ""}> ${l}</label>`).join("");
+  $("links").querySelector(".sheet-x").onclick = () => { $("links").hidden = true; $("linksBtn").classList.remove("on"); };
   $("links").querySelectorAll("input").forEach((c) => (c.onchange = () => { S.links[c.dataset.k] = c.checked; emit("links"); }));
   initOrch();
+  initPhys();
   params();
+}
+function initPhys() {
+  const P = S.phys;
+  $("physForks").value = P.forks;
+  $("physComm").value = P.commutator;
+  $("physForks").onchange = (e) => { P.forks = e.target.value; params(); emit("orch"); };
+  $("physComm").onchange = (e) => { P.commutator = e.target.value; params(); emit("orch"); };
 }
 function initOrch() {
   const O = S.orch;
@@ -65,5 +74,8 @@ function params() {
   }
   const scored = S.orch.rescore === "score" ? "" : S.orch.rescore === "hand" ? " Rescored by hand." : " Rescored as " + (ENSEMBLES[S.orch.rescore]?.[0] || S.orch.rescore) + ".";
   const chairs = S.orch.chairs === "grow" ? " Chairs admit one by one." : "";
-  $("note").textContent = INTERP[Q.mode][1] + (BASIS[Q.basis] || "") + (S.ensemble === "auto" ? "" : " Ensemble override: " + ENSEMBLES[S.ensemble][0] + ".") + scored + chairs;
+  const forks = S.phys.forks === "sum" ? " Forks sum, then a measurement cuts to one length." : " Forks play one length.";
+  const COMM = { pair: "Excite then Mirror", register: "H then Z", fifth: "Fifth", third: "Third", quality: "Quality" };
+  const comm = COMM[S.phys.commutator] ? ` Commutator: ${COMM[S.phys.commutator]}.` : "";
+  $("note").textContent = INTERP[Q.mode][1] + (BASIS[Q.basis] || "") + (S.ensemble === "auto" ? "" : " Ensemble override: " + ENSEMBLES[S.ensemble][0] + ".") + scored + chairs + forks + comm;
 }

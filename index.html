@@ -36,6 +36,7 @@
   </button>
 </header>
 <div id="site-chrome-panel" class="site-chrome-panel" hidden>
+  <button type="button" class="sheet-x" id="site-chrome-close" aria-label="Close">×</button>
   <nav aria-label="Mobile">
     <a href="https://www.doktorare.com/" target="_blank" rel="noopener noreferrer">Home</a>
     <a href="https://www.doktorare.com/robert-rabinowitz" target="_blank" rel="noopener noreferrer">Robert Rabinowitz</a>
@@ -69,23 +70,26 @@
       <details class="info-menu" id="help-menu" name="qc-info">
         <summary>Help <span class="chevron" aria-hidden="true"></span></summary>
         <div class="info-panel">
+          <button type="button" class="sheet-x" aria-label="Close">×</button>
           <h2>How to play it</h2>
           <ol class="help-list">
             <li>Choose an interpretation, a basis, and an ensemble in the row under the title. <em>⇄ couplings</em> turns the links between stations on or off. The italic line under that row is what the current interpretation does.</li>
             <li><strong>I Spectra.</strong> Drag a phasor. Use <em>F</em>, <em>X</em>, <em>Z</em>, <em>T</em>, or <em>Tunnel</em> to remix them. <em>+ spectrum</em> adds one. Tap a harmonic of D along the bottom to measure it. <em>Look</em> collapses the cloud. <em>Prepare again</em> restores it. <em>Let it ring</em> plays it.</li>
             <li><strong>II Pair.</strong> Tap inside an orbit to place or remove a note. <em>Entangled</em> ties the two particles. <em>Orbit</em> plays them. <em>Bell pair</em> prepares a pair; <em>Measure pair</em> reads it. <em>Teleport A → B</em> sends A’s tune to B and clears A.</li>
-            <li><strong>III Histories.</strong> The blocks are sections. <em>+ section</em> adds one. Set where the harmony comes from, the spread, and the tempo. <em>Live one history</em> plays it. <em>measure tempo</em>, <em>measure loudness</em>, and <em>half-life</em> change what gets measured along the way.</li>
+            <li><strong>III Histories.</strong> The blocks are sections. <em>+ section</em> adds one. Set where the harmony comes from, the spread, and the tempo. <em>Live one history</em> plays it. <em>forks</em> is Sum or One. Sum plays every length of a section at once, louder where they agree, and the measured length cuts the rest with a tick. One plays only the measured length. <em>measure tempo</em>, <em>measure loudness</em>, and <em>half-life</em> change what gets measured along the way.</li>
             <li><strong>IV Orbits.</strong> <em>+ ring</em> adds a ring. <em>Spin</em> plays them. <em>Open the box</em> reads the state.</li>
             <li><strong>V Register.</strong> Pick a gate, then tap the grid. Time runs downward. <em>Run</em> plays the state. The two menus choose the tuning and the instrument. <em>readout</em> is the last hit of each pass; it starts as bowl. <em>second pass</em> is the instrument for the second time through; it starts as same instrument. <em>+ qubit</em> and <em>− qubit</em> change the width. <em>clear</em> empties the grid.</li>
             <li><strong>Orchestration</strong>, under the title. <em>tune</em>, <em>inner</em>, and <em>bass</em> set how loud each part sits. They start at 100, 58, and 72. <em>tune double</em>, <em>inner double</em>, and <em>bass double</em> are Bare, Unison, or Octave: Unison and Octave add a second instrument. <em>long notes</em> is Restrike or Held voice. Restrike repeats a note the instrument cannot hold. Held voice gives that line to an instrument that can. <em>rescore</em> is As scored, Assign by hand, or another ensemble. Assign by hand shows melody, counter-melody, counter-voice, chord, and bass voice. <em>chairs</em> is All at once or Admit one by one: bass and chord, then the inner parts, then the tune, then the drums.</li>
-            <li>Each station has its own <em>volume</em> slider. They start at 80. <em>MIDI</em> and <em>WAV</em> download that station. Starting play on one station stops the others.</li>
+            <li><strong>Physics</strong>, under Orchestration. <em>forks</em> starts at Sum. <em>commutator</em> starts at Off. Excite then Mirror plays only the Pair notes that move when those two operations are swapped. H then Z does that for Register: Run plays the state that changes when H and Z are swapped, and it beats. Fifth, Third, and Quality play only the lattice chords that move under that step.</li>
+            <li>Each station has its own <em>volume</em> slider. They start at 50. <em>MIDI</em> and <em>WAV</em> download that station. Starting play on one station stops the others.</li>
           </ol>
-          <p class="help-keys">Press <kbd>?</kbd> to open this. Esc closes it.</p>
+          <p class="help-keys">Press <kbd>?</kbd> to open this. × or Esc closes it.</p>
         </div>
       </details>
       <details class="info-menu" id="theory-menu" name="qc-info">
         <summary>Theory <span class="chevron" aria-hidden="true"></span></summary>
         <div class="info-panel">
+          <button type="button" class="sheet-x" aria-label="Close">×</button>
           <label class="lbl" for="theory">How this works</label>
           <select id="theory" aria-label="How this works">
             <option value="pitch">Pitch and the lattice</option>
@@ -138,6 +142,11 @@
     </span>
     <label class="lbl">chairs <select id="orchChairs" aria-label="Chairs"><option value="all">All at once</option><option value="grow">Admit one by one</option></select></label>
   </div>
+  <div id="phys" class="orch" aria-label="Physics">
+    <span class="orch-name">Physics</span>
+    <label class="lbl">forks <select id="physForks" aria-label="Forks"><option value="sum">Sum</option><option value="one">One</option></select></label>
+    <label class="lbl">commutator <select id="physComm" aria-label="Commutator"><option value="off">Off</option><option value="pair">Excite then Mirror</option><option value="register">H then Z</option><option value="fifth">Fifth</option><option value="third">Third</option><option value="quality">Quality</option></select></label>
+  </div>
   <p id="note"></p>
 
   <section id="spectra" class="st on">
@@ -157,7 +166,7 @@
           <button id="specSound" class="go">▶ Let it ring</button>
           <button id="specMeasure">Look</button>
           <button id="specPrep">Prepare again</button>
-          <label class="lbl vol">volume <input data-station="spectra" type="range" min="0" max="100" value="80" aria-label="Spectra volume"><output>80</output></label>
+          <label class="lbl vol">volume <input data-station="spectra" type="range" min="0" max="100" value="50" aria-label="Spectra volume"><output>50</output></label>
         </div>
         <div class="row"><button id="specMidi" class="mini">⤓ MIDI</button><button id="specWav" class="mini">⤓ WAV</button></div>
         <p id="specStatus" class="status">Drag a phasor. Tap a harmonic of D to measure.</p>
@@ -183,7 +192,7 @@
       <button id="teleport" title="Send A's tune to B; A's original is destroyed (no-cloning)">Teleport A → B</button>
       <span class="sep"></span>
       <button id="pairMidi" class="mini">⤓ MIDI</button><button id="pairWav" class="mini">⤓ WAV</button>
-      <label class="lbl vol">volume <input data-station="pair" type="range" min="0" max="100" value="80" aria-label="Pair volume"><output>80</output></label>
+      <label class="lbl vol">volume <input data-station="pair" type="range" min="0" max="100" value="50" aria-label="Pair volume"><output>50</output></label>
     </div>
     <div id="rules" class="rules"></div>
     <p id="pairLog" class="status center">Tap inside an orbit to place or remove a note.</p>
@@ -197,7 +206,7 @@
       <label class="lbl">♩ <input id="bpm" type="range" min="50" max="160" value="84"><span id="bpmV">84</span></label>
       <span class="sep"></span>
       <button id="histMidi" class="mini">⤓ MIDI</button><button id="histWav" class="mini">⤓ WAV</button>
-      <label class="lbl vol">volume <input data-station="histories" type="range" min="0" max="100" value="80" aria-label="Histories volume"><output>80</output></label>
+      <label class="lbl vol">volume <input data-station="histories" type="range" min="0" max="100" value="50" aria-label="Histories volume"><output>50</output></label>
     </div>
     <div class="row lbls">
       <label title="Each section's tempo is measured too"><input type="checkbox" id="mTempo"> measure tempo</label>
@@ -221,7 +230,7 @@
           <button id="orbPlay" class="go">▶ Spin</button>
           <button id="orbOpen">Open the box</button>
           <button id="orbMidi" class="mini">⤓ MIDI</button><button id="orbWav" class="mini">⤓ WAV</button>
-          <label class="lbl vol">volume <input data-station="orbits" type="range" min="0" max="100" value="80" aria-label="Orbits volume"><output>80</output></label>
+          <label class="lbl vol">volume <input data-station="orbits" type="range" min="0" max="100" value="50" aria-label="Orbits volume"><output>50</output></label>
         </div>
         <p id="orbStatus" class="status"></p>
       </div>
@@ -243,7 +252,7 @@
       <button id="regAdd" class="mini">+ qubit</button><button id="regRem" class="mini">− qubit</button><button id="regClear" class="mini">clear</button>
       <span class="sep"></span>
       <button id="regMidi" class="mini">⤓ MIDI</button><button id="regWav" class="mini">⤓ WAV</button>
-      <label class="lbl vol">volume <input data-station="register" type="range" min="0" max="100" value="80" aria-label="Register volume"><output>80</output></label>
+      <label class="lbl vol">volume <input data-station="register" type="range" min="0" max="100" value="50" aria-label="Register volume"><output>50</output></label>
     </div>
     <p id="regStatus" class="status"></p>
   </section>
@@ -290,6 +299,8 @@
     toggle.addEventListener("click", function () {
       setOpen(toggle.getAttribute("aria-expanded") !== "true");
     });
+    var chromeClose = document.getElementById("site-chrome-close");
+    if (chromeClose) chromeClose.addEventListener("click", function () { setOpen(false); });
     panel.addEventListener("click", function (event) {
       if (event.target.closest("a")) setOpen(false);
     });

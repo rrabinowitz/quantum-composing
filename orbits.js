@@ -12,7 +12,7 @@ export const DRUMS = {
   ksdrum: ["String drum", "ksdrum", 47, 47], hat: ["Hat", "hat", 42, 42], ohat: ["Open hat", "hat", 42, 46, { open: 1 }],
   clave: ["Clave", "clave", 75, 75], wood: ["Woodblock", "woodblock", 79, 76], shaker: ["Shaker", "shaker", 70, 70],
   bowl: ["Bowl", "bowl", 69, 53], kalimba: ["Tine", "kalimba", 74, 81], pizz: ["Pizzicato", "pizz", 50, 37],
-  geiger: ["Geiger", "sample", 60, 39, { sample: "geiger", len: 0.09, randOffset: 3.5 }], cat: ["Cat", "sample", 60, 56, { sample: "cat", len: 0.9 }],
+  geiger: ["Geiger", "sample", 60, 39, { sample: "geiger", len: 0.09, randOffset: 3.5 }],
   static: ["Static", "sample", 60, 39, { sample: "static", len: 0.12, randOffset: 2.5 }],
 };
 export const INK = ["#c2452d", "#2d5fc2", "#1f8a5b", "#b8860b", "#7b3fa0", "#3b8ea5", "#d0657f", "#555"];
@@ -23,7 +23,6 @@ S.orbits = [
   { inst: "hat", cells: P("x?x?x?x?x?x?x?x?"), p: 0.55, ent: -1, anti: false, vel: 0.55 },
   { inst: "bowl", cells: P("x.?.?"), p: 0.45, ent: -1, anti: false, vel: 0.7 },
   { inst: "clave", cells: P("x.x.x.?"), p: 0.5, ent: -1, anti: false, vel: 0.6 },
-  { inst: "cat", cells: P("...c"), p: 0.5, ent: -1, anti: false, vel: 0.7 },
 ];
 const R = S.orbits;
 

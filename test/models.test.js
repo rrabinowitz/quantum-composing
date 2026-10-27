@@ -43,7 +43,7 @@ test("bow and flute produce pitched tone", () => {
 });
 
 test("effects that used to require missing samples still render", () => {
-  for (const sample of ["geiger", "static", "whoosh", "cat"]) {
+  for (const sample of ["geiger", "static", "whoosh"]) {
     const wave = renderVoice(22050, 440, 0.2, "sample", { sample });
     assert.ok(wave && rms(wave) > 0.02, sample);
   }

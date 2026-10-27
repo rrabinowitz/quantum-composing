@@ -40,7 +40,7 @@ export function initPair() {
   $("pairPlay").onclick = () => (stop ? halt() : play());
   wireExport($("pairMidi"), $("pairWav"), () => buildPair(4), "pair");
   ["A", "B"].forEach((w) => $("orb" + w).addEventListener("pointerdown", (e) => edit(w, e)));
-  addEventListener("resize", paint); on("pair", paint); on("show", paint); on("q", refresh); on("ens", refresh); on("links", refresh);
+  addEventListener("resize", paint); on("pair", paint); on("show", paint); on("q", refresh); on("ens", refresh); on("links", refresh); on("orch", refresh);
   paint();
 }
 const log = (h) => ($("pairLog").innerHTML = h);

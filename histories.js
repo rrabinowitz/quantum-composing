@@ -1,9 +1,10 @@
 // III · Histories — a piece is a sum over histories. Each section's length (and optionally tempo,
 // loudness and survival) is a superposition; performing it measures one history.
-import { S, $, on, emit, OPS, op, applyPair, INTERP, pal, ENSEMBLES, beginPerformance, endPerformance } from "./world.js";
+import { S, $, on, emit, OPS, op, applyPair, INTERP, pal, ENSEMBLES, degMidi, beginPerformance, endPerformance } from "./world.js";
 import { born, draw, look, rand, pass, odds, entropy } from "./ket.js";
 import { note, runEvents, at, ac } from "./audio.js";
 import { composer, color, hLabel } from "./score.js";
+import { lengthSuperposition, commuteTheme } from "./physics.js";
 import { measureBar, barNotes, memory } from "./orbits.js";
 import { wireExport } from "./export.js";
 
@@ -24,6 +25,7 @@ export function buildHistory() {
   const form = S.sections.map((s) => {
     const p = born(s.options), i = look(p, li); li = i;
     return { name: s.name, t: s.t, bars: s.options[i].bars, p: p[i], n: s.options.length,
+      options: s.options.map((o, k) => ({ bars: o.bars, p: p[k] })),
       tempo: M.tempo ? TEMPI[draw([1, 1.4, 1])] : 1, dyn: M.dyn ? DYN[draw([1, 1.4, 1])] : DYN[1], dead: rand() < (s.dead || 0) };
   });
   const total = form.reduce((a, f) => a + f.bars, 0), next = composer(bar0, S.links.specToHist ? S.hsrc : "static", total), mem = memory();
@@ -31,27 +33,46 @@ export function buildHistory() {
   const decay = M.half > 0 ? 1 - 2 ** (-1 / M.half) : 0;
   let bi = 0, t = 0;
   form.forEach((f) => {
-    const A = op(S.A, f.t), B = op(S.B, S.rule[f.t]), bar = bar0 / f.tempo;
+    const themed = (raw) => (S.phys.commutator === "pair" ? commuteTheme(raw) : { line: raw, extra: null });
+    const srcA = themed(S.A), srcB = themed(S.B);
+    const A = op(srcA.line, f.t), B = op(srcB.line, S.rule[f.t]);
+    const Ax = srcA.extra ? op(srcA.extra, f.t) : null, Bx = srcB.extra ? op(srcB.extra, S.rule[f.t]) : null;
+    const bar = bar0 / f.tempo;
+    const summed = [];
     if (decay) ROLES.forEach((r) => { if (!alive[r] && rand() < 0.5) alive[r] = true; });
     if (f.dead) notes.push({ midi: 60, t, dur: 1, voice: "sample", vel: 0.06, role: "fx", gen: true, fx: { sample: "static", len: 1.2 } });
     else if (bi) notes.push({ midi: 60, t: Math.max(0, t - 0.4), dur: 1, voice: "sample", vel: 0.03, role: "fx", gen: true, fx: { sample: "whoosh", len: 1.5, rate: 1.3 } });
     for (let k = 0; k < f.bars; k++, bi++) {
-      const from = (k % 2) * 8, gone = [];
+      const from = (k % 2) * 8, e8 = bar / 8, gone = [];
       if (decay) ROLES.forEach((r) => { if (alive[r] && rand() < decay) { alive[r] = false; gone.push(r); } });
       const use = S.links.pairToHist, r = next(use ? A.slice(from, from + 8) : null, use ? B.slice(from, from + 8) : null, t, bar);
       let bn = r.notes;
       if (S.links.orbitToHist) bn = bn.concat(barNotes(measureBar(mem), t, bar));
       bn = bn.filter((n) => (f.dead ? n.role === "bass" || n.role === "fx" : !ROLES.includes(n.role) || alive[n.role]));
       bn.forEach((n) => (n.vel *= f.dyn[1]));
+      const residue = (line, oct, voice, role, lineName) => {
+        if (!line) return;
+        line.slice(from, from + 8).forEach((d, s) => {
+          if (d != null) bn.push({ midi: degMidi(d) + oct, t: t + s * e8, dur: e8 * 0.9, voice, vel: 0.12 * f.dyn[1], role, line: lineName, fx: { phase: 180 } });
+        });
+      };
+      residue(Ax, 12, pal().mel, "mel", "A");
+      residue(Bx, 0, pal().ctr, "ctr", "B");
       gone.forEach(() => bn.push({ midi: 60, t: t + 0.01, dur: 0.2, voice: "sample", vel: 0.05, role: "fx", gen: true, fx: { sample: "geiger", len: 0.25, offset: rand() * 3 } }));
-      notes.push(...bn); harmony.push(r.h);
+      summed.push(bn); harmony.push(r.h);
       const { c, W, collapsing, T, obs } = r.info;
+      const forks = S.phys.forks === "sum" && f.options.length > 1 ? ` · sum of ${f.options.length} lengths` : "";
       const extra = Q.mode === "mwi" ? ` · ${W} world${W > 1 ? "s" : ""}` : Q.mode === "decoherence" ? ` · coherence ${Math.round(c * 100)}%` : collapsing ? " · <b>spontaneous collapse</b>" : "";
       labels.push({ t, html: `<b>${f.name}</b> ${k + 1}/${f.bars} · ${f.dyn[0]}${f.tempo !== 1 ? " · ×" + f.tempo : ""} · <b>${hLabel(r.h)}</b>` +
         (obs ? ` (melody hears <b>${obs.mel.name}</b>, counter-voice hears <b>${obs.cp.name}</b>)` : "") + ` · T = ${T.toFixed(2)}${extra}` +
-        (gone.length ? " · ☢ " + gone.map((x) => RN[x]).join(", ") + " decayed" : "") + (f.dead ? " · <b>the cat is dead</b>; only the bass is left" : "") });
+        (gone.length ? " · ☢ " + gone.map((x) => RN[x]).join(", ") + " decayed" : "") + (f.dead ? " · <b>the cat is dead</b>; only the bass is left" : "") + forks });
       t += bar;
     }
+    if (S.phys.forks === "sum" && !f.dead && f.options.length > 1) {
+      const sup = lengthSuperposition(summed, f.options, f.bars);
+      notes.push(...sup.notes);
+      if (sup.cut) notes.push({ midi: 100, t, dur: 0.01, voice: "tick", vel: 0.07, role: "fx", gen: true });
+    } else summed.forEach((bn) => notes.push(...bn));
   });
   return { form, notes: color(notes, { bar: bar0, total: t }), labels, harmony, total: t, bpm: S.bpm, mode: Q.mode };
 }

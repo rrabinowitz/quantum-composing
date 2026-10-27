@@ -538,20 +538,6 @@ function cohFreq(freq, fx) {
   return freq * 2 ** ((unit - 0.5) * (1 - fx.coh) * 0.06);
 }
 
-function meow(sr) {
-  const n = Math.floor(sr * 0.55);
-  const out = new Float32Array(n);
-  let phase = 0;
-  for (let i = 0; i < n; i += 1) {
-    const t = i / sr;
-    const env = Math.sin(Math.min(Math.PI, (Math.PI * t) / 0.55)) ** 0.7;
-    const f = 480 + 320 * Math.sin((Math.PI * t) / 0.55);
-    phase += TAU * f / sr;
-    out[i] = Math.sin(phase) * env;
-  }
-  return finish(out, sr, 0.4);
-}
-
 function burst(sr, dur, colorHz, q = 1.2) {
   const n = Math.max(1, Math.floor(sr * dur));
   const out = new Float32Array(n);
@@ -578,7 +564,7 @@ const LOUDNESS = {
   tom: 1.519, reverse: 0.547, ksdrum: 1.769, noise: 1.159, bass: 0.647,
   pizz: 0.695, pluck: 0.695, guitar: 0.630, snare: 1.316, cello: 0.547,
   clave: 1.920, harp: 0.752, shaker: 1.663, tick: 1.861, hat: 1.130, "hat:open": 0.830,
-  "sample:cat": 0.495, "sample:static": 1.193, "sample:whoosh": 1.206, "sample:geiger": 1.956,
+  "sample:static": 1.193, "sample:whoosh": 1.206, "sample:geiger": 1.956,
 };
 
 function level(wave, voice, fx) {
@@ -597,7 +583,6 @@ function synthesize(sr, freq, dur, voice, fx = {}) {
   const f = cohFreq(freq, fx);
   if (voice === "sample") {
     const kind = fx.sample || "static";
-    if (kind === "cat") return meow(sr);
     if (kind === "geiger") return burst(sr, 0.03, 5200, 3);
     if (kind === "whoosh") return burst(sr, Math.min(1.5, d + 0.3), 650, 0.45);
     return burst(sr, Math.min(1.3, d + 0.15), 1500, 0.7);

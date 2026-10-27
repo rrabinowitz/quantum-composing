@@ -4,6 +4,7 @@ import { odds, draw, look, rand, born, pass, entropy } from "./ket.js";
 import { Walk, nameOf, nodeOf } from "./lattice.js";
 import { vary, counterVoice, rhythmFor } from "./boltzmann.js";
 import { dress } from "./orch.js";
+import { commuteTheme, latticeResidue, latticeStep } from "./physics.js";
 
 const pack = (name, w = 1) => ({ name, w, tones: tonesOf(name) });
 const VOW = ["o", "a", "e", "u"];
@@ -26,11 +27,13 @@ const bassOf = (prev, tones) => { let m = rToMidi(tones[0]) - 24; while (m - pre
 
 export function composer(bar0, src = S.hsrc, totalBars = 16) {
   const Q = S.q, mode = Q.mode, P = pal();
-  const walk = src === "lattice" ? new Walk(S.spec) : null;
+  const heard = latticeStep(S.phys.commutator) ? latticeResidue(S.spec, S.phys.commutator) : S.spec;
+  const spec = heard.length ? heard : S.spec;
+  const walk = src === "lattice" ? new Walk(spec) : null;
   let upper = [57, 62, 66], bass = 38, b = 0, last = null, since = 9;
   const cpPrev = [55, 45, 66, 70], melPrev = [74], belief = new Map();
-  const nameFor = walk ? nameOf : (i) => S.spec[i].name;
-  const probs = () => (walk ? walk.probs() : odds(S.spec));
+  const nameFor = walk ? nameOf : (i) => spec[i].name;
+  const probs = () => (walk ? walk.probs() : odds(spec));
   let future = null;
   if (mode === "transactional" && src !== "static") {
     // the confirmation wave: compose from the final spectrum backwards
@@ -73,25 +76,49 @@ export function composer(bar0, src = S.hsrc, totalBars = 16) {
     const cold = mode === "decoherence" && c < 0.3, fx = (x = {}) => (mode === "decoherence" ? { coh: c, ...x } : x);
     const melV = cold ? "harp" : P.mel, cpV = cold ? "harp" : P.cp, notes = [];
     const cantus = new Array(8).fill(null);
+    const phaseOf = (name) => {
+      if (walk) { const i = nodeOf(name); return i < 0 ? 0 : (Math.atan2(walk.im[i], walk.re[i]) * 180) / Math.PI; }
+      const s = S.spec.find((x) => x.name === name); return s ? s.phase : 0;
+    };
+    h.forEach((x) => { x.phase = phaseOf(x.name); if (x.obs) { x.obs.mel.phase = phaseOf(x.obs.mel.name); x.obs.cp.phase = phaseOf(x.obs.cp.name); } });
+    const haloOf = (list, t, dur, voice, vel, role, world, extra) => (list || []).forEach((item) => notes.push({
+      midi: item.midi, t, dur, voice, vel: vel * 0.42 * item.w, role, world, halo: true, fx: fx({ ...(extra || {}), halo: true }),
+    }));
     for (let k = 0; k < W; k++) {
       const reg = [0, 12, -12, 24][k], vel = 0.16 / Math.sqrt(W), world = W > 1 ? k : undefined;
-      if (A8) vary(A8, melH.tones, T, stick).forEach((d, s) => {
+      const pan = W > 1 ? -0.8 + (1.6 * k) / (W - 1) : 0;
+      if (A8) vary(A8, melH.tones, T, stick).forEach((step, s) => {
+        const d = step.d;
         if (d == null) return; const m = degMidi(d) + 12 + reg; if (!k) cantus[s] = m;
-        notes.push({ midi: m, t: t0 + s * e8, dur: e8 * 0.92, voice: melV, vel, role: "mel", world, fx: fx({ vowel: VOW[k], pan: W > 1 ? -0.8 + (1.6 * k) / (W - 1) : 0 }) });
+        notes.push({ midi: m, t: t0 + s * e8, dur: e8 * 0.92, voice: melV, vel, role: "mel", world, fx: fx({ vowel: VOW[k], pan }) });
+        haloOf(step.halo.map((item) => ({ midi: item.midi + reg, w: item.w })), t0 + s * e8, e8 * 0.92, melV, vel, "mel", world, { vowel: VOW[k], pan });
       });
       else {
         const g = counterVoice({ cantus: null, tones: melH.tones, rhythm: rhythmFor(mode === "copenhagen" ? "pilot" : mode, { world: k + 1, c, collapsing, since }), prev: melPrev[0] + reg, range: [70 + reg, 88 + reg], T, stick });
         if (!k) melPrev[0] = g.last;
-        g.notes.forEach((n) => { if (!k) for (let s = n.s; s < n.s + n.len; s++) cantus[s] = n.midi; notes.push({ midi: n.midi, t: t0 + n.s * e8, dur: n.len * e8 * 0.95, voice: melV, vel, role: "mel", world, fx: fx({ vowel: VOW[k], pan: W > 1 ? -0.8 + (1.6 * k) / (W - 1) : 0 }) }); });
+        g.notes.forEach((n) => {
+          if (!k) for (let s = n.s; s < n.s + n.len; s++) cantus[s] = n.midi;
+          notes.push({ midi: n.midi, t: t0 + n.s * e8, dur: n.len * e8 * 0.95, voice: melV, vel, role: "mel", world, fx: fx({ vowel: VOW[k], pan }) });
+          haloOf(n.halo, t0 + n.s * e8, n.len * e8 * 0.95, melV, vel, "mel", world, { vowel: VOW[k], pan });
+        });
       }
     }
-    if (B8) vary(B8, main.tones, T, stick).forEach((d, s) => { if (d != null) notes.push({ midi: degMidi(d), t: t0 + s * e8, dur: e8 * 0.92, voice: P.ctr, vel: 0.1, role: "ctr", fx: fx({ vowel: "o", pan: 0.3 }) }); });
+    if (B8) vary(B8, main.tones, T, stick).forEach((step, s) => {
+      const d = step.d;
+      if (d == null) return;
+      notes.push({ midi: degMidi(d), t: t0 + s * e8, dur: e8 * 0.92, voice: P.ctr, vel: 0.1, role: "ctr", fx: fx({ vowel: "o", pan: 0.3 }) });
+      haloOf(step.halo, t0 + s * e8, e8 * 0.92, P.ctr, 0.1, "ctr", undefined, { vowel: "o", pan: 0.3 });
+    });
     const nCp = mode === "mwi" ? W : mode === "grw" && collapsing ? 2 : 1;
     for (let k = 0; k < nCp; k++) {
       const contour = mode === "pilot" ? (s) => 56 + 8 * Math.sin((2 * Math.PI * (b * 8 + s)) / 20) : null;
       const g = counterVoice({ cantus, tones: cpH.tones, rhythm: rhythmFor(mode, { world: k, c, collapsing, since }), prev: cpPrev[k], range: CP_RANGE[k], T, stick, contour });
       cpPrev[k] = g.last;
-      g.notes.forEach((n) => notes.push({ midi: n.midi, t: t0 + n.s * e8, dur: n.len * e8 * (mode === "zeno" ? 1.05 : 0.95), voice: cpV, vel: 0.1 / Math.sqrt(nCp), role: "cp", fx: fx({ vowel: VOW[(k + 1) % 4], glide: mode === "pilot" ? n.from : undefined, pan: -0.3 }) }));
+      g.notes.forEach((n) => {
+        const dur = n.len * e8 * (mode === "zeno" ? 1.05 : 0.95);
+        notes.push({ midi: n.midi, t: t0 + n.s * e8, dur, voice: cpV, vel: 0.1 / Math.sqrt(nCp), role: "cp", fx: fx({ vowel: VOW[(k + 1) % 4], glide: mode === "pilot" ? n.from : undefined, pan: -0.3 }) });
+        haloOf(n.halo, t0 + n.s * e8, dur, cpV, 0.1 / Math.sqrt(nCp), "cp", undefined, { vowel: VOW[(k + 1) % 4], pan: -0.3 });
+      });
     }
     // accompaniment
     const branches = h.map((x) => ({ ...x, v: lead(upper, x.tones) }));
@@ -100,7 +127,7 @@ export function composer(bar0, src = S.hsrc, totalBars = 16) {
     const bs = (m, t, dur, vel, voice = P.bass, f) => notes.push({ midi: m, t, dur, voice, vel, role: "bass", fx: f });
     const fifth = bass + 12 * Math.log2(3 / 2);
     if (mode === "copenhagen") { [0, 1, 2, 1, 0, 1, 2, 1].forEach((v, s) => ch(upper[v], t0 + s * e8, e8 * 1.5, 0.05)); bs(bass, t0, bar * 0.48, 0.12); bs(fifth, t0 + bar / 2, bar * 0.45, 0.1); }
-    else if (mode === "mwi") { branches.forEach((x, i) => x.v.forEach((m) => ch(m, t0, bar * 1.02, 0.05 * Math.sqrt(x.w), { fx: { pan: [-0.7, 0.7, 0, -0.35][i % 4] } }))); bs(bass, t0, bar, 0.1); }
+    else if (mode === "mwi") { branches.forEach((x, i) => x.v.forEach((m) => ch(m, t0, bar * 1.02, 0.05 * Math.sqrt(x.w), { fx: { pan: [-0.7, 0.7, 0, -0.35][i % 4], phase: x.phase || 0 } }))); bs(bass, t0, bar, 0.1); }
     else if (mode === "zeno") { [0, 4].forEach((s) => upper.forEach((m) => ch(m, t0 + s * e8, bar * 0.55, 0.045))); bs(bass, t0, bar * 1.05, 0.1); }
     else if (mode === "decoherence") {
       if (rand() < c) for (let s = 0; s < 16; s++) { const x = branches[Math.floor(rand() * branches.length)]; ch(x.v[Math.floor(rand() * 3)] + (rand() - 0.5) * c, t0 + s * (bar / 16), bar / 8, 0.04 * Math.sqrt(x.w), { fx: fx() }); }
@@ -117,7 +144,12 @@ export function composer(bar0, src = S.hsrc, totalBars = 16) {
     } else if (mode === "qbism") { const conf = Math.min(1, 0.4 + b * 0.08); [0, 3, 6].forEach((s) => upper.forEach((m) => ch(m, t0 + s * e8, e8 * 2.2, 0.04 * conf))); bs(bass, t0, bar * 0.6, 0.1); bs(fifth, t0 + 5 * e8, bar * 0.3, 0.07); }
     else if (mode === "transactional") { upper.forEach((m) => ch(m, t0, bar * 0.6, 0.06)); bs(bass, t0, bar * 0.95, 0.1); }
     b++;
-    notes.forEach((n) => (n.gen = true));
+    notes.forEach((n) => {
+      n.gen = true;
+      if (n.role === "fx" || n.halo) return;
+      const src = n.role === "mel" ? melH : n.role === "cp" ? cpH : main;
+      n.fx = { ...(n.fx || {}), harmony: src.tones, phase: n.fx && n.fx.phase != null ? n.fx.phase : (src.phase || 0) };
+    });
     return { notes, h, info: { c, W, collapsing, T, obs: main.obs } };
   };
 }
@@ -126,7 +158,10 @@ export function composer(bar0, src = S.hsrc, totalBars = 16) {
 export function stream() {
   let b = 0, last = null;
   return () => {
-    const Q = S.q, p = odds(S.spec), all = () => p.map((w, i) => ({ i, w })).filter((x) => x.w > 0.03);
+    const Q = S.q;
+    const heard = latticeStep(S.phys.commutator) ? latticeResidue(S.spec, S.phys.commutator) : S.spec;
+    const spec = heard.length ? heard : S.spec;
+    const p = odds(spec), all = () => p.map((w, i) => ({ i, w })).filter((x) => x.w > 0.03);
     let r;
     if (Q.mode === "mwi") r = all();
     else if (Q.mode === "zeno") { last = look(p, last); r = [{ i: last, w: 1 }]; }
@@ -134,7 +169,7 @@ export function stream() {
     else if (Q.mode === "grw") { if (last == null || rand() < Q.grw) last = draw(p); r = [{ i: last, w: 1 }]; }
     else r = [{ i: draw(p), w: 1 }];
     b++;
-    return r.map((x) => ({ name: S.spec[x.i].name, w: x.w }));
+    return r.map((x) => ({ name: spec[x.i].name, w: x.w }));
   };
 }
 export const hLabel = (h) => h.map((x) => x.name + (h.length > 1 ? " " + Math.round(x.w * 100) + "%" : "")).join(" ⊕ ");
@@ -194,9 +229,19 @@ export function pairBranches(A, B, bell) {
 }
 export function pairNotes(branches, t0, e8, hs) {
   const out = [];
-  branches.forEach(([A, B]) => { for (let s = 0; s < 16; s++) { const t = t0 + s * e8, v = 0.16 / Math.sqrt(branches.length);
-    if (A[s] != null) out.push({ midi: degMidi(A[s]) + 12, t, dur: e8 * 0.92, voice: pal().mel, vel: v, role: "theme", line: "A" });
-    if (B[s] != null) out.push({ midi: degMidi(B[s]), t, dur: e8 * 0.92, voice: pal().ctr, vel: v, role: "theme", line: "B" }); } });
+  branches.forEach(([A0, B0]) => {
+    const A = S.phys.commutator === "pair" ? commuteTheme(A0) : { line: A0, extra: null };
+    const B = S.phys.commutator === "pair" ? commuteTheme(B0) : { line: B0, extra: null };
+    const put = (line, extra, voice, role, lineName, oct) => {
+      for (let s = 0; s < 16; s++) {
+        const t = t0 + s * e8, v = 0.16 / Math.sqrt(branches.length);
+        if (line[s] != null) out.push({ midi: degMidi(line[s]) + oct, t, dur: e8 * 0.92, voice, vel: v, role, line: lineName });
+        if (extra && extra[s] != null) out.push({ midi: degMidi(extra[s]) + oct, t, dur: e8 * 0.92, voice, vel: v * 0.85, role, line: lineName, fx: { phase: 180 } });
+      }
+    };
+    put(A.line, A.extra, pal().mel, "theme", "A", 12);
+    put(B.line, B.extra, pal().ctr, "theme", "B", 0);
+  });
   if (hs) for (let k = 0; k < 2; k++) bed(hs(), t0 + k * 8 * e8, 8 * e8 * 0.95, out);
   return out;
 }

@@ -3,6 +3,7 @@
 // from the Boltzmann distribution exp(−E/T). Hot = wild, cold = strict.
 import { degMidi, rToMidi, DEG_MIN, DEG_MAX } from "./world.js";
 import { rand } from "./ket.js";
+import { tenneyHalo } from "./physics.js";
 
 const RAT = [];
 for (let n = 1; n <= 32; n++) for (let d = 1; d <= 32; d++) { const r = n / d; if (r >= 1 && r < 2 && gcd(n, d) === 1) RAT.push([1200 * Math.log2(r), Math.log2(n * d)]); }
@@ -28,10 +29,12 @@ function boltzmann(cands, E, T) {
 export function vary(degs, tones, T, stick = 0) {
   const tm = tones.map(rToMidi);
   return degs.map((d) => {
-    if (d == null) return null;
-    if (stick && rand() < stick) return d;
+    if (d == null) return { d: null, halo: [] };
+    if (stick && rand() < stick) return { d, halo: [] };
     const c = []; for (let k = -2; k <= 2; k++) if (d + k >= DEG_MIN && d + k <= DEG_MAX) c.push(d + k);
-    return boltzmann(c, (x) => 0.55 * roughness(degMidi(x), tm) + 1.1 * Math.abs(x - d), T);
+    const E = (x) => 0.55 * roughness(degMidi(x), tm) + 1.1 * Math.abs(x - d);
+    const chosen = boltzmann(c, E, T);
+    return { d: chosen, halo: tenneyHalo(degMidi(chosen), c.filter((x) => x !== chosen).map((d) => degMidi(d)), T) };
   });
 }
 
@@ -44,10 +47,12 @@ export function counterVoice({ cantus, tones, rhythm, prev, range, T, stick = 0,
   const notes = []; let p = prev;
   for (const { s, len } of rhythm) {
     const cf = cantus ? cantus[s] : null;
-    const m = stick && rand() < stick ? p : boltzmann(cands, (x) =>
-      0.6 * roughness(x, tm) + (cf != null ? 0.45 * hd(x - cf) + (Math.abs(x - cf) < 0.3 ? 4 : 0) : 0) +
-      Math.abs(x - p) / 2.5 + (contour ? Math.abs(x - contour(s)) / 3 : 0), T);
-    notes.push({ s, len, midi: m, from: p }); p = m;
+    const E = (x) => 0.6 * roughness(x, tm) + (cf != null ? 0.45 * hd(x - cf) + (Math.abs(x - cf) < 0.3 ? 4 : 0) : 0) +
+      Math.abs(x - p) / 2.5 + (contour ? Math.abs(x - contour(s)) / 3 : 0);
+    const stuck = stick && rand() < stick;
+    const m = stuck ? p : boltzmann(cands, E, T);
+    const halo = stuck ? [] : tenneyHalo(m, cands, T);
+    notes.push({ s, len, midi: m, from: p, halo }); p = m;
   }
   return { notes, last: p };
 }

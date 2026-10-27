@@ -106,6 +106,7 @@ export const S = {
   meas: { tempo: false, dyn: false, half: 0 },
   q: { mode: "copenhagen", basis: "computational", zeno: 0.75, gamma: 0.35, grw: 0.3, seed: 1905 },
   links: Object.fromEntries(Object.entries(LINKS).map(([k, v]) => [k, v[1]])),
+  phys: { forks: "sum", commutator: "off" },
   orch: {
     tune: 100,
     inner: 58,

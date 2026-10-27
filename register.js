@@ -4,6 +4,7 @@ import { S, $, on, degMidi, rToMidi, harmMidi, beginPerformance, endPerformance 
 import { rand, pass, look } from "./ket.js";
 import { note, runLoop, at, ac } from "./audio.js";
 import { dressRegister, SCORE_VOICES, READOUT_VOICES } from "./orch.js";
+import { nearestBeat, hzResidue } from "./physics.js";
 import { wireExport } from "./export.js";
 
 const r2 = Math.SQRT1_2, C = (re, im = 0) => ({ re, im });
@@ -69,8 +70,18 @@ function step(sim, r) {
   return ev;
 }
 function rowNotes(sim, t, e8, ev, out, voice) {
-  sim.probs().forEach((w, k) => { if (w >= 0.01) out.push({ midi: pitchOf(k), t, dur: e8 * 1.8, voice, vel: 0.16 * Math.sqrt(w), role: "mel", fx: { pan: Math.sin(sim.phase(k)) * 0.8 } }); });
+  const row = [];
+  sim.probs().forEach((w, k) => {
+    if (w >= 0.01) row.push({ midi: pitchOf(k), t, dur: e8 * 1.8, voice, vel: 0.16 * Math.sqrt(w), role: "mel", fx: { pan: Math.sin(sim.phase(k)) * 0.8, phase: (sim.phase(k) * 180) / Math.PI } });
+  });
+  nearestBeat(row);
+  row.forEach((n) => out.push(n));
   ev.forEach((e) => out.push({ midi: e.grw ? 36 : 100, t, dur: e.grw ? 0.3 : 0.01, voice: e.grw ? "thump" : "tick", vel: 0.05, role: "fx", fx: {} }));
+}
+function residueNotes(t, e8, voice) {
+  return hzResidue().filter((x) => x.mag > 0.02).map((x) => ({
+    midi: pitchOf(x.k), t, dur: e8 * 1.8, voice, vel: Math.min(0.22, 0.12 * x.mag), role: "mel", fx: { beatHz: 3.5, phase: 90 },
+  }));
 }
 function readout(sim, t, e8, out) {
   if (S.q.mode === "mwi") return null;
@@ -81,6 +92,14 @@ function readout(sim, t, e8, out) {
 export function buildRegister(loops = 2) {
   pass(8);
   const e8 = 30 / S.bpm, out = [];
+  if (S.phys.commutator === "register") {
+    for (let l = 0; l < loops; l++) {
+      const voice = l > 0 && R.second ? R.second : R.inst;
+      for (let r = 0; r < ROWS; r++) residueNotes((l * ROWS + r) * e8, e8, voice).forEach((n) => out.push(n));
+    }
+    const total = loops * ROWS * e8 + 2;
+    return { notes: dressRegister(out, total), total, bpm: S.bpm };
+  }
   for (let l = 0; l < loops; l++) {
     const voice = l > 0 && R.second ? R.second : R.inst;
     const sim = new Sim(R.nq);
@@ -113,6 +132,7 @@ export function initRegister() {
   wireExport($("regMidi"), $("regWav"), () => buildRegister(2), "register");
   $("regCv").addEventListener("pointerdown", click);
   addEventListener("resize", paint); on("q", () => preview()); on("show", paint);
+  on("orch", () => { if (stop) { halt(); play(); } });
   preview();
 }
 const geo = () => { const c = $("regCv"), W = c.clientWidth, lw = 30, rh = 26; return { c, W, H: rh * ROWS + 34, lw, rh, cw: (W - lw) / R.nq, top: 30 }; };
@@ -186,9 +206,11 @@ function play() {
   stop = runLoop(() => 30 / S.bpm, (i, t, bus) => {
     const r = i % ROWS, e8 = 30 / S.bpm, out = [];
     if (!r) sim = new Sim(R.nq);
-    const ev = step(sim, r); rowNotes(sim, 0, e8, ev, out);
-    const k = r === ROWS - 1 ? readout(sim, e8 * 0.5, e8, out) : null;
-    out.forEach((n) => note(n.midi, t + n.t, n.dur, n.voice, n.vel, bus, n.fx));
+    const ev = step(sim, r);
+    if (S.phys.commutator === "register") residueNotes(0, e8, R.inst).forEach((n) => out.push(n));
+    else rowNotes(sim, 0, e8, ev, out, R.inst);
+    const k = S.phys.commutator === "register" ? null : r === ROWS - 1 ? readout(sim, e8 * 0.5, e8, out) : null;
+    dressRegister(out, e8 * 4).forEach((n) => note(n.midi, t + n.t, n.dur, n.voice, n.vel, bus, n.fx));
     const sn = Object.assign(Object.create(Sim.prototype), sim, { re: sim.re.slice(), im: sim.im.slice() });
     at(t, () => {
       row = r; snap = sn; paint();

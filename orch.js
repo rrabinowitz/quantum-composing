@@ -1,6 +1,7 @@
 // Orchestration after Rimsky-Korsakov: tessitura, balance, doubling,
 // how long a voice can hold, spacing of the chord, and rescoring.
-import { S } from "./world.js";
+import { S, rToMidi } from "./world.js";
+import { widen, splitOverlap, interfere } from "./physics.js";
 
 /** good = the register where the tone is characteristic. possible = it can speak. hold = seconds a single attack lasts. carry = how easily it covers another part. */
 const T = {
@@ -175,7 +176,7 @@ function partner(voice) {
 function doubleOf(n) {
   const key = n.role === "bass" ? "bassDouble" : tuneRole(n) ? "tuneDouble" : innerRole(n) ? "innerDouble" : null;
   const kind = key ? S.orch[key] : "bare";
-  if (!scenic(n) || n.double || !kind || kind === "bare") return null;
+  if (!scenic(n) || n.double || n.halo || n.width || n.fx?.halo || n.fx?.width || !kind || kind === "bare") return null;
   const voice = partner(n.voice);
   let midi = n.midi;
   if (kind === "octave") {
@@ -194,6 +195,40 @@ function doubleOf(n) {
     double: true,
     fx: { ...(n.fx || {}), pan: n.fx && n.fx.pan ? -n.fx.pan * 0.5 : 0.35 },
   };
+}
+
+function project(n) {
+  const tones = n.fx && n.fx.harmony;
+  if (!tones || !tones.length || n.role === "readout" || n.role === "bass") return [n];
+  const midis = tones.map((t) => rToMidi(t));
+  const s = splitOverlap(n.midi, n.vel, midis);
+  const made = [];
+  if (s.inside > 0) made.push({ ...n, vel: s.inside, role: "chord", fx: { ...n.fx, overlap: s.overlap } });
+  if (s.outside > 0) {
+    made.push({
+      ...n,
+      vel: s.outside,
+      role: n.role === "chord" ? "mel" : n.role,
+      fx: { ...n.fx, overlap: s.overlap, beatHz: s.beatHz || n.fx.beatHz },
+    });
+  }
+  return made.length ? made : [n];
+}
+
+function withWidth(n) {
+  if (!scenic(n) || n.halo || n.width || n.fx?.halo || n.fx?.width || n.role === "readout") return [n];
+  const band = info(n.voice);
+  const watch = S.q.mode === "zeno" ? S.q.zeno : 0;
+  const w = widen(n.midi, n.dur || 0.2, band?.hold ?? n.dur, watch);
+  n.dur = w.dur;
+  const extra = w.midis.map((midi) => ({
+    ...n,
+    midi,
+    vel: n.vel * 0.34,
+    width: true,
+    fx: { ...(n.fx || {}), width: true },
+  }));
+  return [n, ...extra];
 }
 
 function admitted(n, total) {
@@ -220,6 +255,8 @@ export function dress(notes, opt = {}) {
   if (opt.tessitura !== false) list.forEach((n) => { if (scenic(n)) n.midi = fitPitch(n); });
   if (opt.spacing !== false) space(list.filter(scenic));
   if (opt.length !== false) list = list.flatMap((n) => (scenic(n) ? applyLength(n) : [n]));
+  if (opt.width !== false) list = list.flatMap(withWidth);
+  if (opt.overlap !== false) list = list.flatMap((n) => (scenic(n) && !n.halo && !n.width ? project(n) : [n]));
   const musical = list.some((n) => scenic(n) && n.role !== "readout");
   if (opt.chairs !== false && musical) list = list.filter((n) => admitted(n, total));
   if (opt.balance !== false) balance(list);
@@ -231,6 +268,7 @@ export function dress(notes, opt = {}) {
     }
     list = list.concat(extra);
   }
+  if (opt.interfere !== false) list = interfere(list);
   return list;
 }
 

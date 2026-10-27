@@ -24,7 +24,7 @@ export async function prepare() {}
 export async function loadSamples() {}
 const isNative = typeof window !== "undefined" && !!window.webkit?.messageHandlers?.saveBlob;
 const isSafari = !isNative && /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|Edg/.test(navigator.userAgent);
-let ctx, master, meter, nativeAudio, streamAudio;
+let ctx, master, meter, heard, nativeAudio;
 // Jot feedback delay network. Low-frequency T60 is 1.7 s; the one-pole in each loop shortens the highs.
 function impulse(c, sec) {
   const sr = c.sampleRate;
@@ -66,15 +66,12 @@ export function makeOutput(c) {
   verb.buffer = impulse(c, 2.4); wet.gain.value = 0.25;
   out.connect(comp); out.connect(verb); verb.connect(wet); wet.connect(comp);
   if (c === ctx) {
+    heard = c.createGain();
+    heard.gain.value = outputGainValue();
+    comp.connect(heard);
     meter = c.createAnalyser(); meter.fftSize = 2048;
-    comp.connect(meter);
-    if (isSafari && c.createMediaStreamDestination) {
-      const stream = c.createMediaStreamDestination();
-      meter.connect(stream);
-      streamAudio = new Audio();
-      streamAudio.srcObject = stream.stream;
-      streamAudio.playsInline = true;
-    } else meter.connect(c.destination);
+    heard.connect(meter);
+    meter.connect(c.destination);
   } else comp.connect(c.destination);
   return out;
 }
@@ -90,33 +87,35 @@ export function ac() {
   return ctx;
 }
 function showAudioUnlock() {
-  if (document.getElementById("audioUnlock")) return;
+  if (document.getElementById("audioUnlock") || (ctx && ctx.state === "running")) return;
   const button = document.createElement("button");
   button.id = "audioUnlock";
-  button.textContent = "Sound blocked · tap to enable";
+  button.type = "button";
+  button.textContent = "Tap to enable sound";
   button.setAttribute("aria-label", "Enable sound");
   button.onclick = unlockAudio;
   document.body.appendChild(button);
 }
 function unlockAudio() {
   const c = ac();
-  if (streamAudio && streamAudio.paused) {
-    const playing = streamAudio.play();
-    if (playing) playing.catch((e) => {
-      console.warn("Native audio output unavailable", e);
-      meter.connect(c.destination);
-      streamAudio = null;
-    });
+  if (c.state === "running") {
+    document.getElementById("audioUnlock")?.remove();
+    return;
   }
-  if (c.state === "running") return;
   // WebKit may leave resume() pending until a source starts in the same gesture.
   const source = c.createBufferSource();
   source.buffer = c.createBuffer(1, 1, c.sampleRate);
   source.connect(c.destination);
   source.start(0);
-  try { Promise.resolve(c.resume()).catch(showAudioUnlock); } catch { showAudioUnlock(); }
-  setTimeout(() => { if (c.state !== "running") showAudioUnlock(); }, 600);
+  let pending;
+  try { pending = c.resume(); } catch { showAudioUnlock(); return; }
+  if (pending && pending.then) pending.then(() => {
+    if (c.state === "running") document.getElementById("audioUnlock")?.remove();
+    else showAudioUnlock();
+  }, showAudioUnlock);
+  else if (c.state !== "running") showAudioUnlock();
 }
+document.addEventListener("pointerdown", unlockAudio, { capture: true });
 document.addEventListener("click", unlockAudio, { capture: true });
 document.addEventListener("touchend", unlockAudio, { capture: true });
 document.addEventListener("keydown", unlockAudio, { capture: true });
@@ -154,7 +153,7 @@ if (isSafari) {
       meter.getByteTimeDomainData(data);
       for (const x of data) peak = Math.max(peak, Math.abs(x - 128));
       if (performance.now() - start < 1600) requestAnimationFrame(sample);
-      else label.textContent = `Audio ${ctx.state} · output signal ${Math.round(peak / 128 * 100)}% · ${streamAudio ? streamAudio.paused ? "media paused" : "media playing" : "direct output"}`;
+      else label.textContent = `Audio ${ctx.state} · output signal ${Math.round(peak / 128 * 100)}% · direct output`;
     };
     sample();
   });
@@ -162,15 +161,36 @@ if (isSafari) {
 export const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
 
 const STATIONS = ["spectra", "pair", "histories", "orbits", "register"];
+// Drive into the compressor stays at the old slider-80 level. The slider is the
+// gain after the compressor: 50 is that same loudness, 100 is twice as loud.
+// Spectra 16 meets Histories. Orbits 3.5 meets Pair.
+const STATION_TRIM = { spectra: 16, pair: 2.07, histories: 1, orbits: 3.5, register: 1.84 };
+const DRIVE = 0.8;
 const stationGain = new Map();
-const stationLevel = new Map(STATIONS.map((id) => [id, 0.8]));
+const stationLevel = new Map(STATIONS.map((id) => [id, 0.5]));
 let activeStation = "spectra";
+
+function stationGainValue(id) {
+  return DRIVE * (STATION_TRIM[id] ?? 1);
+}
+
+function outputGainValue() {
+  return (stationLevel.get(activeStation) ?? 0.5) * 2;
+}
+
+function rampOutput() {
+  if (!heard) return;
+  const now = heard.context.currentTime;
+  heard.gain.cancelScheduledValues(now);
+  heard.gain.setValueAtTime(heard.gain.value, now);
+  heard.gain.linearRampToValueAtTime(outputGainValue(), now + 0.03);
+}
 
 function ensureStations() {
   if (stationGain.size || !ctx || !master) return;
   for (const id of STATIONS) {
     const gain = ctx.createGain();
-    gain.gain.value = stationLevel.get(id) ?? 0.8;
+    gain.gain.value = stationGainValue(id);
     gain.connect(master);
     stationGain.set(id, gain);
   }
@@ -182,11 +202,13 @@ function stationInput() {
 }
 
 export function setActiveStation(id) {
-  if (STATIONS.includes(id)) activeStation = id;
+  if (!STATIONS.includes(id)) return;
+  activeStation = id;
+  rampOutput();
 }
 
 export function activeStationGain() {
-  return stationLevel.get(activeStation) ?? 0.8;
+  return stationLevel.get(activeStation) ?? 0.5;
 }
 
 export function bindStationVolumes(root = document) {
@@ -197,12 +219,7 @@ export function bindStationVolumes(root = document) {
       const unit = Math.max(0, Math.min(1, Number(input.value) / 100));
       stationLevel.set(id, unit);
       if (out) out.textContent = input.value;
-      const node = stationGain.get(id);
-      if (!node) return;
-      const now = node.context.currentTime;
-      node.gain.cancelScheduledValues(now);
-      node.gain.setValueAtTime(node.gain.value, now);
-      node.gain.linearRampToValueAtTime(unit, now + 0.03);
+      if (id === activeStation) rampOutput();
     };
     input.addEventListener("input", apply);
     if (out) out.textContent = input.value;
@@ -255,6 +272,20 @@ export function note(midi, t, dur, voice = "piano", vel = 0.15, dest, fx = {}) {
   fx = { ...(fx || {}), strike: fx && fx.strike != null ? fx.strike : vel };
   let out = dest;
   if (fx.pan && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, fx.pan)); p.connect(dest); out = p; }
+  if (fx.beatHz > 0.05) {
+    const mod = c.createGain();
+    mod.gain.setValueAtTime(1, t);
+    const lfo = c.createOscillator();
+    const depth = c.createGain();
+    depth.gain.value = 0.42;
+    lfo.frequency.setValueAtTime(fx.beatHz, t);
+    lfo.connect(depth);
+    depth.connect(mod.gain);
+    lfo.start(t);
+    lfo.stop(t + Math.max(dur, 0.2) + 2);
+    mod.connect(out);
+    out = mod;
+  }
   const f = mtof(midi + (fx.detune || 0) / 100), env = c.createGain();
   env.gain.setValueAtTime(0, t);
   const smear = fx.smear || 0, collapseT = 0.03 + smear * 0.5;

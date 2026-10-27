@@ -14,7 +14,10 @@ body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Georgia,"I
 .info-menu summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .chevron{width:7px;height:7px;margin-top:-3px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg)}
 .info-menu[open] .chevron{margin-top:3px;transform:rotate(225deg)}
-.info-panel{position:absolute;z-index:40;top:calc(100% + 8px);right:0;width:min(440px,calc(100vw - 32px));max-height:min(70vh,560px);overflow:auto;-webkit-overflow-scrolling:touch;padding:18px 20px;background:var(--card);border:1px solid var(--rule);border-radius:6px;box-shadow:0 12px 28px #2a262222}
+.info-panel{position:absolute;z-index:40;top:calc(100% + 8px);right:0;width:min(440px,calc(100vw - 32px));max-height:min(70vh,560px);overflow:auto;-webkit-overflow-scrolling:touch;padding:18px 48px 18px 20px;background:var(--card);border:1px solid var(--rule);border-radius:6px;box-shadow:0 12px 28px #2a262222}
+.sheet-x{position:absolute;top:6px;right:6px;z-index:2;width:44px;height:44px;padding:0;border:0;background:transparent;color:var(--ink);font:22px/1 Georgia,serif;cursor:pointer}
+.sheet-x:hover,.sheet-x:focus-visible{color:var(--accent)}
+.sheet-x:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .info-panel h2{margin:12px 0 10px;font-size:22px;font-weight:400}
 .info-panel p,.help-list{color:var(--dim);font-size:14px}
 .help-list{margin:0 0 12px;padding-left:1.2em}
@@ -31,7 +34,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Georgia,"I
 #frame{display:flex;flex-wrap:wrap;gap:8px;align-items:center;position:relative}
 #qParam{display:flex;gap:6px;align-items:center}
 #qParam input[type=number]{width:90px}
-#links{position:absolute;top:100%;right:0;z-index:5;margin-top:6px;background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:10px 14px;display:flex;flex-direction:column;gap:6px;box-shadow:0 8px 24px #2a262222;font-size:14px}
+#links{position:absolute;top:100%;right:0;z-index:5;margin-top:6px;background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:12px 48px 12px 14px;display:flex;flex-direction:column;gap:6px;box-shadow:0 8px 24px #2a262222;font-size:14px}
 #links[hidden]{display:none}
 #links label{display:flex;gap:8px;align-items:center;cursor:pointer}
 .orch{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:8px 0 4px;padding:8px 0;border-top:1px solid var(--rule)}
@@ -39,6 +42,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Georgia,"I
 .orch .lbl{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:13px}
 .orch input[type=range]{width:88px}
 .orch select{padding:4px 8px}
+#phys{border-top:0;margin-top:0;padding-top:0}
 #orchHand{display:contents}
 #orchHand[hidden]{display:none}
 #note{font-style:italic;color:var(--dim);margin:10px 0 16px;max-width:760px;font-size:14px}
@@ -47,7 +51,7 @@ button{cursor:pointer}button:hover{border-color:var(--ink)}
 button:disabled{opacity:.55;cursor:wait}
 button.go{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 button.go:hover{background:#000}
-#audioUnlock{position:fixed;z-index:1000;bottom:1rem;left:50%;transform:translateX(-50%);padding:.8rem 1.2rem;background:var(--ink);color:var(--paper);border:0;border-radius:999px;box-shadow:0 8px 24px #2a262244}
+#audioUnlock{position:fixed;z-index:11000;inset:0;margin:0;padding:24px;display:flex;align-items:center;justify-content:center;background:#2a2622ee;color:var(--paper);border:0;border-radius:0;font:28px/1.3 Georgia,"Iowan Old Style",serif;text-align:center;cursor:pointer}
 #audioStatus{position:fixed;z-index:900;bottom:1rem;right:1rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 2rem);padding:8px 10px;background:var(--card);border:1px solid var(--rule);border-radius:6px;box-shadow:0 8px 24px #2a262222;font-size:13px}
 #audioStatus button{font-size:13px;padding:3px 8px}
 button.mini{padding:3px 8px;font-size:13px}
